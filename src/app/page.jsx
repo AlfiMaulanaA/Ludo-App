@@ -62,6 +62,7 @@ export default function Home() {
 
   // Modals
   const [showPause, setShowPause] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
@@ -748,11 +749,11 @@ export default function Home() {
             roomCode={isOnline ? onlineRoomState?.code : null}
             onOpenEmotes={() => setShowEmotes(true)}
             onOpenChat={() => setShowChat(true)}
-            onBackToMenu={() => (isOnline ? setShowPause(true) : leaveToMenu())}
+            onBackToMenu={() => setShowExitConfirm(true)}
           />
 
-          <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-            <div className="lg:col-span-3 grid grid-cols-2 lg:grid-cols-1 gap-3">
+          <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-2 sm:gap-4 items-center">
+            <div className="lg:col-span-3 grid grid-cols-2 lg:grid-cols-1 gap-1.5 sm:gap-3">
               {sidePlayers[0].map(p => (
                 <PlayerCard
                   key={p.id}
@@ -766,7 +767,7 @@ export default function Home() {
               ))}
             </div>
 
-            <div className="lg:col-span-6 flex flex-col items-center justify-center gap-4">
+            <div className="lg:col-span-6 flex flex-col items-center justify-center gap-2 sm:gap-4">
               <LudoBoard game={game} validMovePieceIds={validMovePieceIds} onPieceClick={handlePieceClick} floatingEmotes={floatingEmotes} />
               <DiceRoller
                 diceValue={shownDice}
@@ -774,16 +775,12 @@ export default function Home() {
                 isMyTurn={isMyTurn}
                 onRollDice={handleRollDice}
                 activeColor={activePlayer?.color || 'red'}
+                activePlayerName={activePlayer?.name || ''}
+                activePlayerType={activePlayer?.type || 'human'}
               />
-              {activePlayer?.type === 'bot' && game.turnState !== 'GAME_OVER' && (
-                <p className="text-xs font-display font-bold text-slate-500 animate-pulse">Bot sedang berpikir...</p>
-              )}
-              {isOnline && !isMyTurn && activePlayer?.type === 'human' && game.turnState !== 'GAME_OVER' && (
-                <p className="text-xs font-display font-bold text-slate-500">Menunggu {activePlayer.name}...</p>
-              )}
             </div>
 
-            <div className="lg:col-span-3 grid grid-cols-2 lg:grid-cols-1 gap-3">
+            <div className="lg:col-span-3 grid grid-cols-2 lg:grid-cols-1 gap-1.5 sm:gap-3">
               {sidePlayers[1].map(p => (
                 <PlayerCard
                   key={p.id}
@@ -807,8 +804,28 @@ export default function Home() {
           onRestart={isOnline ? null : () => { setShowPause(false); restartOffline(); }}
           onSettings={() => { setShowPause(false); setShowSettings(true); }}
           onQuit={() => {
-            if (window.confirm('Kembali ke menu utama? Game offline akan tersimpan untuk Continue.')) leaveToMenu();
+            setShowPause(false);
+            setShowExitConfirm(true);
           }}
+        />
+      )}
+
+      {showExitConfirm && (
+        <ConfirmModal
+          title="Keluar dari Permainan?"
+          message={
+            isOnline
+              ? "Apakah kamu yakin ingin keluar dari ruangan ini? Tempatmu akan digantikan oleh Bot AI."
+              : "Apakah kamu yakin ingin keluar ke menu utama? Permainan offline kamu akan disimpan dan bisa dilanjutkan nanti."
+          }
+          confirmText="Ya, Keluar"
+          cancelText="Batal"
+          isDanger={true}
+          onConfirm={() => {
+            setShowExitConfirm(false);
+            leaveToMenu();
+          }}
+          onCancel={() => setShowExitConfirm(false)}
         />
       )}
 

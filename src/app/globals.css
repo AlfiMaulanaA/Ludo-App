@@ -303,7 +303,16 @@ body {
   border: 3px solid #fff;
   box-shadow: 0 6px 0 #d6deea, 0 18px 28px -10px rgba(30, 41, 59, 0.4), inset 0 -4px 8px rgba(30, 41, 59, 0.06);
   position: relative;
-  transition: transform 0.15s ease;
+  transition: transform 0.15s ease, opacity 0.2s ease, filter 0.2s ease;
+}
+.die.disabled {
+  opacity: 0.35;
+  filter: grayscale(85%) blur(0.3px);
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  box-shadow: 0 2px 0 #cbd5e1, inset 0 -2px 4px rgba(0, 0, 0, 0.05);
+  animation: none !important;
+  transform: scale(0.94) !important;
 }
 .die.rolling { animation: dieRoll 0.5s linear infinite; }
 .die.ready { animation: wiggle 0.8s ease-in-out infinite; }

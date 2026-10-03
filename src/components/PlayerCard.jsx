@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { LABELS, SYMBOLS } from '../lib/ludo/board';
+import { LABELS } from '../lib/ludo/board';
 import { User, Bot, Clock } from 'lucide-react';
 
 export default function PlayerCard({
@@ -32,10 +32,10 @@ export default function PlayerCard({
   };
 
   const activeGlows = {
-    red: 'ring-4 ring-rose-400/50 shadow-lg scale-[1.02]',
-    green: 'ring-4 ring-emerald-400/50 shadow-lg scale-[1.02]',
-    yellow: 'ring-4 ring-amber-400/50 shadow-lg scale-[1.02]',
-    blue: 'ring-4 ring-blue-400/50 shadow-lg scale-[1.02]'
+    red: 'ring-2 sm:ring-4 ring-rose-400/60 shadow-md scale-[1.01]',
+    green: 'ring-2 sm:ring-4 ring-emerald-400/60 shadow-md scale-[1.01]',
+    yellow: 'ring-2 sm:ring-4 ring-amber-400/60 shadow-md scale-[1.01]',
+    blue: 'ring-2 sm:ring-4 ring-blue-400/60 shadow-md scale-[1.01]'
   };
 
   // Turn Timer color indicator
@@ -45,48 +45,50 @@ export default function PlayerCard({
 
   return (
     <div
-      className={`relative p-3 rounded-2xl border-2 transition-all duration-300 card ${
+      className={`relative p-2 sm:p-2.5 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 card ${
         cardAccents[player.color] || cardAccents.red
-      } ${isActive ? activeGlows[player.color] : 'opacity-85'}`}
+      } ${isActive ? activeGlows[player.color] : 'opacity-80'}`}
     >
       {/* Floating Speech Bubble / Sticker Reaction */}
       {activeSpeechBubble && (
-        <div className="absolute -top-10 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-2xl bg-white border-2 border-slate-200 shadow-xl font-display font-black text-xs text-slate-800 whitespace-nowrap animate-pop-in flex items-center gap-1">
+        <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-30 px-2 py-0.5 rounded-xl bg-white border border-slate-300 shadow-lg font-display font-black text-[10px] sm:text-xs text-slate-800 whitespace-nowrap animate-pop-in flex items-center gap-1 scale-90">
           <span>{activeSpeechBubble}</span>
-          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-white border-r-2 border-b-2 border-slate-200 rotate-45" />
+          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white border-r border-b border-slate-300 rotate-45" />
         </div>
       )}
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-2.5">
         {/* Avatar */}
         <div
-          className={`w-10 h-10 rounded-2xl flex items-center justify-center font-display font-bold text-white shadow-md ${
+          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center font-display font-bold text-white shadow-sm shrink-0 ${
             badgeBgs[player.color]
           }`}
         >
-          {isBot ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
+          {isBot ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
         </div>
 
         {/* Player Name & Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-display font-extrabold truncate text-slate-800">{player.name}</span>
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-xs sm:text-sm font-display font-extrabold truncate text-slate-900 leading-tight">
+              {player.name}
+            </span>
             {player.rank && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-300 text-slate-900 shadow-sm">
+              <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-300 text-slate-900 shadow-xs shrink-0">
                 #{player.rank}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-            <span>{LABELS[player.color]}</span>
-            <span>•</span>
-            <span className="font-bold text-slate-700">{finishedCount}/4 Finish</span>
+
+          <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 mt-0.5">
+            <span className="truncate">{LABELS[player.color]}</span>
+            <span className="font-black text-slate-700 shrink-0">{finishedCount}/4</span>
           </div>
         </div>
 
         {/* Turn timer countdown badge */}
         {isActive && turnTimerSeconds > 0 && (
-          <div className={`px-2.5 py-1 rounded-full ${timerColor} text-xs font-display font-black shadow-md flex items-center gap-1`}>
+          <div className={`px-1.5 sm:px-2 py-0.5 rounded-full ${timerColor} text-[10px] sm:text-xs font-display font-black shadow-sm flex items-center gap-0.5 shrink-0`}>
             <Clock className="w-3 h-3" />
             <span>{turnTimerSeconds}s</span>
           </div>
@@ -94,7 +96,7 @@ export default function PlayerCard({
       </div>
 
       {/* Finished Progress Bar */}
-      <div className="mt-2.5 w-full bg-slate-200/80 h-2 rounded-full overflow-hidden border border-white">
+      <div className="mt-1.5 w-full bg-slate-200/90 h-1 sm:h-1.5 rounded-full overflow-hidden border border-white/60">
         <div
           style={{ width: `${(finishedCount / 4) * 100}%` }}
           className={`h-full transition-all duration-300 ${badgeBgs[player.color]}`}
