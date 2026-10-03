@@ -1,6 +1,7 @@
 import './globals.css';
 
 export const metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   title: 'Ludo App — Developed by maul.dev',
   description:
     'Game Ludo modern yang colorful oleh maul.dev: Local Pass & Play, lawan Bot AI, dan multiplayer online real-time. Gratis dimainkan di browser.',
