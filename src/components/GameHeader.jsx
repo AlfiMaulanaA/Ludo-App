@@ -31,17 +31,8 @@ export default function GameHeader({
         </div>
       )}
 
-      {/* Left: App Logo / Exit / Room Code */}
+      {/* Left: App Logo / Room Code */}
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-        <button
-          type="button"
-          onClick={onBackToMenu}
-          className="icon-btn hover:border-rose-300 hover:bg-rose-50 text-rose-600 p-1.5 sm:p-2"
-          title="Keluar Permainan"
-        >
-          <LogOut className="w-4 h-4 sm:w-5 sm:h-5 text-rose-600" />
-        </button>
-
         {roomCode ? (
           <div
             onClick={copyRoomCode}

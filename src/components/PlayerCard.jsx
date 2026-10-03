@@ -45,13 +45,13 @@ export default function PlayerCard({
 
   return (
     <div
-      className={`relative p-2 sm:p-2.5 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 card ${
+      className={`relative p-2 sm:p-2.5 rounded-md sm:rounded-lg border-2 transition-all duration-300 card ${
         cardAccents[player.color] || cardAccents.red
       } ${isActive ? activeGlows[player.color] : 'opacity-80'}`}
     >
       {/* Floating Speech Bubble / Sticker Reaction */}
       {activeSpeechBubble && (
-        <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-30 px-2 py-0.5 rounded-xl bg-white border border-slate-300 shadow-lg font-display font-black text-[10px] sm:text-xs text-slate-800 whitespace-nowrap animate-pop-in flex items-center gap-1 scale-90">
+        <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-30 px-2 py-0.5 rounded-md bg-white border border-slate-300 shadow-lg font-display font-black text-[10px] sm:text-xs text-slate-800 whitespace-nowrap animate-pop-in flex items-center gap-1 scale-90">
           <span>{activeSpeechBubble}</span>
           <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white border-r border-b border-slate-300 rotate-45" />
         </div>
@@ -60,7 +60,7 @@ export default function PlayerCard({
       <div className="flex items-center gap-1.5 sm:gap-2.5">
         {/* Avatar */}
         <div
-          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center font-display font-bold text-white shadow-sm shrink-0 ${
+          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-md flex items-center justify-center font-display font-bold text-white shadow-sm shrink-0 ${
             badgeBgs[player.color]
           }`}
         >
