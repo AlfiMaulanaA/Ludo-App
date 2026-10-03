@@ -55,8 +55,11 @@ export function initSocketServer(io) {
       socket.roomCode = roomCode;
       socket.playerId = hostPlayer.id;
 
+      const roomState = getRoomState(room);
+      io.to(roomCode).emit('ROOM_UPDATED', roomState);
+
       if (typeof callback === 'function') {
-        callback({ success: true, roomCode, player: hostPlayer, roomState: getRoomState(room) });
+        callback({ success: true, roomCode, player: hostPlayer, roomState });
       }
     });
 
@@ -78,7 +81,7 @@ export function initSocketServer(io) {
       }
 
       const playerIndex = room.players.length;
-      const playerColor = COLORS[playerIndex];
+      const playerColor = COLORS.find(c => !room.players.some(p => p.color === c)) || COLORS[playerIndex % COLORS.length];
       const newPlayer = {
         socketId: socket.id,
         id: `p${playerIndex}`,
@@ -112,7 +115,7 @@ export function initSocketServer(io) {
       if (targetRoom) {
         // Join existing
         const playerIndex = targetRoom.players.length;
-        const playerColor = COLORS[playerIndex];
+        const playerColor = COLORS.find(c => !targetRoom.players.some(p => p.color === c)) || COLORS[playerIndex % COLORS.length];
         const newPlayer = {
           socketId: socket.id,
           id: `p${playerIndex}`,
@@ -162,6 +165,27 @@ export function initSocketServer(io) {
       }
     });
 
+    // Select Player Color
+    socket.on('SELECT_COLOR', ({ color }, callback) => {
+      const room = rooms.get(socket.roomCode);
+      if (!room || room.status !== 'LOBBY') {
+        return callback?.({ success: false, error: 'Tidak dapat mengubah warna saat permainan berlangsung' });
+      }
+      if (!COLORS.includes(color)) {
+        return callback?.({ success: false, error: 'Warna tidak valid' });
+      }
+      const isTaken = room.players.some(p => p.socketId !== socket.id && p.color === color);
+      if (isTaken) {
+        return callback?.({ success: false, error: 'Warna ini sudah dipilih pemain lain' });
+      }
+      const player = room.players.find(p => p.socketId === socket.id);
+      if (player) {
+        player.color = color;
+        io.to(room.code).emit('ROOM_UPDATED', getRoomState(room));
+        callback?.({ success: true, color });
+      }
+    });
+
     // Toggle Ready
     socket.on('TOGGLE_READY', () => {
       const room = rooms.get(socket.roomCode);
@@ -184,11 +208,12 @@ export function initSocketServer(io) {
       // Fill remaining slots with Bots if configured
       while (room.players.length < room.config.playerCount) {
         const botIdx = room.players.length;
+        const botColor = COLORS.find(c => !room.players.some(p => p.color === c)) || COLORS[botIdx % COLORS.length];
         room.players.push({
           socketId: null,
           id: `p${botIdx}`,
           name: `Bot ${botIdx + 1}`,
-          color: COLORS[botIdx],
+          color: botColor,
           type: 'bot',
           botDifficulty: 'medium',
           isReady: true,

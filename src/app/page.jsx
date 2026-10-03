@@ -71,8 +71,10 @@ export default function Home() {
 
   // Setup
   const [localPlayerCount, setLocalPlayerCount] = useState(4);
+  const [localPlayerColors, setLocalPlayerColors] = useState(['red', 'green', 'yellow', 'blue']);
   const [botCount, setBotCount] = useState(3);
   const [botDifficulty, setBotDifficulty] = useState('medium');
+  const [humanBotColor, setHumanBotColor] = useState('red');
   const [setupTimer, setSetupTimer] = useState(15);
   const [initialRoomCode, setInitialRoomCode] = useState('');
 
@@ -301,22 +303,41 @@ export default function Home() {
   // Starters
   const beginGame = config => {
     audioRef.current?.play('click');
-    const colors = COLOR_LAYOUT[config.length];
-    const g = createGame(config.map((p, i) => ({ ...p, color: colors[i] })), { ...settings, turnTimer: setupTimer });
+    const defaultColors = COLOR_LAYOUT[config.length];
+    const preparedConfig = config.map((p, i) => ({
+      ...p,
+      color: p.color || defaultColors[i]
+    }));
+    const g = createGame(preparedConfig, { ...settings, turnTimer: setupTimer });
     setGame(g);
     setShownDice(null);
     setViewState('GAME');
     audioRef.current?.startMusic();
   };
 
-  const startLocalGame = () =>
-    beginGame(Array.from({ length: localPlayerCount }, (_, i) => ({ name: `Pemain ${i + 1}`, type: 'human' })));
+  const startLocalGame = () => {
+    const players = Array.from({ length: localPlayerCount }, (_, i) => ({
+      name: `Pemain ${i + 1}`,
+      type: 'human',
+      color: localPlayerColors[i]
+    }));
+    beginGame(players);
+  };
 
-  const startBotGame = () =>
-    beginGame([
-      { name: 'Kamu', type: 'human' },
-      ...Array.from({ length: botCount }, (_, i) => ({ name: `Bot ${i + 1}`, type: 'bot', botDifficulty }))
-    ]);
+  const startBotGame = () => {
+    const allColors = ['red', 'green', 'yellow', 'blue'];
+    const remainingColors = allColors.filter(c => c !== humanBotColor);
+    const players = [
+      { name: 'Kamu', type: 'human', color: humanBotColor },
+      ...Array.from({ length: botCount }, (_, i) => ({
+        name: `Bot ${i + 1}`,
+        type: 'bot',
+        botDifficulty,
+        color: remainingColors[i % remainingColors.length]
+      }))
+    ];
+    beginGame(players);
+  };
 
   const continueGame = () => {
     const saved = loadSavedGame();
@@ -381,9 +402,35 @@ export default function Home() {
     connectSocket();
     setViewState('ONLINE_LOBBY');
   };
-  const handleCreateOnlineRoom = (opts, cb) => getSocket()?.emit('CREATE_ROOM', opts, cb);
-  const handleJoinOnlineRoom = (opts, cb) => getSocket()?.emit('JOIN_ROOM', opts, cb);
-  const handleQuickMatchOnlineRoom = (opts, cb) => getSocket()?.emit('QUICK_MATCH', opts, cb);
+  const handleCreateOnlineRoom = (opts, cb) => {
+    const s = connectSocket();
+    if (!s) return cb?.({ success: false, error: 'Socket tidak dapat terhubung' });
+    s.emit('CREATE_ROOM', opts, res => {
+      if (res?.success && res?.roomState) setOnlineRoomState(res.roomState);
+      cb?.(res);
+    });
+  };
+  const handleJoinOnlineRoom = (opts, cb) => {
+    const s = connectSocket();
+    if (!s) return cb?.({ success: false, error: 'Socket tidak dapat terhubung' });
+    s.emit('JOIN_ROOM', opts, res => {
+      if (res?.success && res?.roomState) setOnlineRoomState(res.roomState);
+      cb?.(res);
+    });
+  };
+  const handleQuickMatchOnlineRoom = (opts, cb) => {
+    const s = connectSocket();
+    if (!s) return cb?.({ success: false, error: 'Socket tidak dapat terhubung' });
+    s.emit('QUICK_MATCH', opts, res => {
+      if (res?.success && res?.roomState) setOnlineRoomState(res.roomState);
+      cb?.(res);
+    });
+  };
+  const handleSelectColorOnlineRoom = (color, cb) => {
+    const s = connectSocket();
+    if (!s) return cb?.({ success: false, error: 'Socket tidak dapat terhubung' });
+    s.emit('SELECT_COLOR', { color }, cb);
+  };
   const handleToggleReady = () => getSocket()?.emit('TOGGLE_READY');
   const handleStartOnlineGame = () =>
     getSocket()?.emit(
@@ -505,6 +552,50 @@ export default function Home() {
             <label className="block text-xs font-display font-bold text-slate-600 mb-2">Jumlah Pemain</label>
             <Segmented options={[2, 3, 4]} value={localPlayerCount} onChange={setLocalPlayerCount} format={n => `${n} Pemain`} />
           </div>
+
+          <div>
+            <label className="block text-xs font-display font-bold text-slate-600 mb-2">Warna Pemain</label>
+            <div className="space-y-2">
+              {Array.from({ length: localPlayerCount }).map((_, idx) => (
+                <div key={idx} className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 border border-slate-200">
+                  <span className="text-xs font-display font-extrabold text-slate-700">Pemain {idx + 1}</span>
+                  <div className="flex gap-1.5">
+                    {[
+                      { color: 'red', bg: 'bg-rose-500' },
+                      { color: 'green', bg: 'bg-emerald-500' },
+                      { color: 'yellow', bg: 'bg-amber-400' },
+                      { color: 'blue', bg: 'bg-blue-500' }
+                    ].map(c => {
+                      const isSelected = localPlayerColors[idx] === c.color;
+                      const isUsedByOther = localPlayerColors.slice(0, localPlayerCount).some((col, i) => i !== idx && col === c.color);
+                      return (
+                        <button
+                          key={c.color}
+                          type="button"
+                          disabled={isUsedByOther}
+                          onClick={() => {
+                            const updated = [...localPlayerColors];
+                            const currentOwnerIdx = updated.indexOf(c.color);
+                            if (currentOwnerIdx !== -1) {
+                              updated[currentOwnerIdx] = updated[idx];
+                            }
+                            updated[idx] = c.color;
+                            setLocalPlayerColors(updated);
+                          }}
+                          className={`w-7 h-7 rounded-xl flex items-center justify-center border-2 transition-all ${
+                            isSelected ? 'border-purple-600 ring-2 ring-purple-300 scale-110' : isUsedByOther ? 'opacity-30 cursor-not-allowed border-slate-200' : 'border-slate-200 hover:scale-105'
+                          }`}
+                        >
+                          <div className={`w-4 h-4 rounded-full ${c.bg}`} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-display font-bold text-slate-600 mb-2">Timer Giliran</label>
             <Segmented options={TIMER_OPTIONS} value={setupTimer} onChange={setSetupTimer} format={n => (n ? `${n}s` : 'Off')} />
@@ -535,6 +626,31 @@ export default function Home() {
             <label className="block text-xs font-display font-bold text-slate-600 mb-2">Tingkat Kesulitan</label>
             <Segmented options={['easy', 'medium', 'hard']} value={botDifficulty} onChange={setBotDifficulty} format={d => d.toUpperCase()} />
           </div>
+
+          <div>
+            <label className="block text-xs font-display font-bold text-slate-600 mb-2">Pilih Warna Kamu</label>
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { color: 'red', label: 'Merah', bg: 'bg-rose-500' },
+                { color: 'green', label: 'Hijau', bg: 'bg-emerald-500' },
+                { color: 'yellow', label: 'Kuning', bg: 'bg-amber-400' },
+                { color: 'blue', label: 'Biru', bg: 'bg-blue-500' }
+              ].map(c => (
+                <button
+                  key={c.color}
+                  type="button"
+                  onClick={() => setHumanBotColor(c.color)}
+                  className={`p-2 rounded-xl flex flex-col items-center gap-1 border-2 transition-all ${
+                    humanBotColor === c.color ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-400 scale-105' : 'border-slate-200 hover:border-slate-300 bg-white'
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded-full ${c.bg} shadow-sm`} />
+                  <span className="text-[10px] font-display font-black text-slate-700">{c.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-display font-bold text-slate-600 mb-2">Timer Giliran</label>
             <Segmented options={TIMER_OPTIONS} value={setupTimer} onChange={setSetupTimer} format={n => (n ? `${n}s` : 'Off')} />
@@ -560,6 +676,7 @@ export default function Home() {
           onCreateRoom={handleCreateOnlineRoom}
           onJoinRoom={handleJoinOnlineRoom}
           onQuickMatch={handleQuickMatchOnlineRoom}
+          onSelectColor={handleSelectColorOnlineRoom}
           roomState={onlineRoomState}
           onToggleReady={handleToggleReady}
           onStartGame={handleStartOnlineGame}

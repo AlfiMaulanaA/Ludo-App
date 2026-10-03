@@ -1,5 +1,4 @@
 import { createServer } from 'http';
-import { parse } from 'url';
 import next from 'next';
 import { Server } from 'socket.io';
 import { initSocketServer } from './src/server/socketServer.js';
@@ -13,7 +12,7 @@ const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
   const httpServer = createServer((req, res) => {
-    const parsedUrl = parse(req.url, true);
+    const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     handle(req, res, parsedUrl);
   });
 

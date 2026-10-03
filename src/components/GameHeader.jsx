@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Pause, Volume2, VolumeX, MessageSquare, Smile, Copy, ArrowLeft } from 'lucide-react';
+import { Pause, Volume2, VolumeX, MessageSquare, Smile, Copy, ArrowLeft, LogOut } from 'lucide-react';
 
 export default function GameHeader({
   game,
@@ -28,10 +28,10 @@ export default function GameHeader({
         <button
           type="button"
           onClick={onBackToMenu}
-          className="icon-btn"
-          title="Kembali ke Menu"
+          className="icon-btn hover:border-rose-300 hover:bg-rose-50 text-rose-600"
+          title="Keluar Permainan (Exit Game)"
         >
-          <ArrowLeft className="w-5 h-5 text-slate-700" />
+          <LogOut className="w-5 h-5 text-rose-600" />
         </button>
 
         {roomCode ? (
@@ -111,6 +111,15 @@ export default function GameHeader({
           title="Pause Menu"
         >
           <Pause className="w-5 h-5 text-slate-700" />
+        </button>
+
+        <button
+          type="button"
+          onClick={onBackToMenu}
+          className="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 text-xs font-display font-black flex items-center gap-1.5 hover:bg-rose-100 transition-colors"
+          title="Keluar Permainan"
+        >
+          <LogOut className="w-4 h-4" /> Keluar Game
         </button>
       </div>
     </header>

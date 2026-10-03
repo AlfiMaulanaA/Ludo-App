@@ -8,6 +8,7 @@ export default function OnlineLobby({
   onCreateRoom,
   onJoinRoom,
   onQuickMatch,
+  onSelectColor,
   roomState,
   onToggleReady,
   onStartGame,
@@ -26,6 +27,15 @@ export default function OnlineLobby({
 
   const currentRoom = roomState;
   const isHost = currentRoom && currentRoom.hostSocketId === socketId;
+  const myPlayer = currentRoom?.players.find(p => p.socketId === socketId);
+
+  const handleColorSelect = color => {
+    if (!onSelectColor || !myPlayer || myPlayer.color === color) return;
+    setError('');
+    onSelectColor(color, res => {
+      if (!res?.success) setError(res?.error || 'Warna tidak dapat dipilih');
+    });
+  };
 
   useEffect(() => {
     if (initialCode && !joinCode) setJoinCode(initialCode);
@@ -383,6 +393,47 @@ export default function OnlineLobby({
               </div>
             ))}
           </div>
+
+          {/* COLOR SELECTION FOR MY PLAYER */}
+          {myPlayer && (
+            <div className="p-3.5 rounded-2xl bg-slate-50 border-2 border-slate-100 space-y-2">
+              <div className="text-xs font-display font-bold text-slate-600">Pilih Warna Bidak Kamu:</div>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { color: 'red', name: 'Merah', bg: 'bg-rose-500' },
+                  { color: 'green', name: 'Hijau', bg: 'bg-emerald-500' },
+                  { color: 'yellow', name: 'Kuning', bg: 'bg-amber-400' },
+                  { color: 'blue', name: 'Biru', bg: 'bg-blue-500' }
+                ].map(c => {
+                  const takenBy = currentRoom.players.find(p => p.color === c.color);
+                  const isMine = myPlayer.color === c.color;
+                  const isTakenByOther = takenBy && !isMine;
+
+                  return (
+                    <button
+                      key={c.color}
+                      type="button"
+                      disabled={isTakenByOther}
+                      onClick={() => handleColorSelect(c.color)}
+                      className={`p-2 rounded-xl flex flex-col items-center justify-center gap-1 border-2 transition-all ${
+                        isMine
+                          ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-400 scale-105'
+                          : isTakenByOther
+                          ? 'opacity-40 border-slate-200 bg-slate-100 cursor-not-allowed'
+                          : 'border-slate-200 hover:border-slate-300 bg-white cursor-pointer'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full ${c.bg} shadow-sm`} />
+                      <span className={`text-[10px] font-display font-black ${isMine ? 'text-purple-700' : 'text-slate-700'}`}>
+                        {c.name}
+                      </span>
+                      {isTakenByOther && <span className="text-[8px] font-bold text-slate-400 truncate max-w-full">{takenBy.name}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Action buttons */}
           <div className="space-y-3 pt-2">
