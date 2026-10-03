@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Key, Play, CheckCircle2, Copy, Crown, ArrowLeft, Edit3, Check } from 'lucide-react';
+import { Users, Plus, Key, Play, CheckCircle2, Copy, Crown, ArrowLeft, Edit3, Check, Share2 } from 'lucide-react';
 import { readStorage, writeStorage } from '../lib/ludo/storage';
+import { copyToClipboard } from '../lib/ludo/clipboard';
 
 export default function OnlineLobby({
   onBack,
@@ -53,6 +54,24 @@ export default function OnlineLobby({
     setEditingName(false);
   };
 
+  const handleShareRoom = async () => {
+    if (!currentRoom?.code) return;
+    const directUrl = `${window.location.origin}/?room=${currentRoom.code}`;
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Main Ludo Bareng!',
+          text: `Gabung ke ruangan Ludo (Kode: ${currentRoom.code}) dan main bareng!`,
+          url: directUrl
+        });
+        return;
+      } catch {
+        // Fallback if cancelled
+      }
+    }
+    copyDirectLink();
+  };
+
   useEffect(() => {
     if (initialCode && !joinCode) setJoinCode(initialCode);
   }, [initialCode]);
@@ -102,18 +121,26 @@ export default function OnlineLobby({
     });
   };
 
-  const copyDirectLink = () => {
+  const copyDirectLink = async () => {
     if (!currentRoom?.code) return;
     const directUrl = `${window.location.origin}/?room=${currentRoom.code}`;
-    navigator.clipboard.writeText(directUrl);
-    setCopySuccess('Link direct berhasil disalin!');
+    const ok = await copyToClipboard(directUrl);
+    if (ok) {
+      setCopySuccess('Link direct berhasil disalin!');
+    } else {
+      setCopySuccess('Gagal menyalin link secara otomatis.');
+    }
     setTimeout(() => setCopySuccess(''), 3000);
   };
 
-  const copyCodeOnly = () => {
+  const copyCodeOnly = async () => {
     if (!currentRoom?.code) return;
-    navigator.clipboard.writeText(currentRoom.code);
-    setCopySuccess(`Kode ${currentRoom.code} berhasil disalin!`);
+    const ok = await copyToClipboard(currentRoom.code);
+    if (ok) {
+      setCopySuccess(`Kode ${currentRoom.code} berhasil disalin!`);
+    } else {
+      setCopySuccess('Gagal menyalin kode.');
+    }
     setTimeout(() => setCopySuccess(''), 3000);
   };
 
@@ -355,17 +382,27 @@ export default function OnlineLobby({
                 </button>
               </div>
             </div>
-            <div className="text-right space-y-1">
+            <div className="text-right space-y-1.5">
               <span className="text-xs font-display font-bold text-slate-600 chip px-3 py-1 block">
                 {currentRoom.players.length}/{currentRoom.config?.playerCount || 4} Pemain
               </span>
-              <button
-                type="button"
-                onClick={copyDirectLink}
-                className="text-[11px] font-display font-extrabold text-purple-600 hover:underline flex items-center gap-1 justify-end"
-              >
-                <Copy className="w-3 h-3" /> Salin Direct Link URL
-              </button>
+              <div className="flex items-center gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={copyDirectLink}
+                  className="text-[11px] font-display font-extrabold text-purple-600 hover:underline flex items-center gap-1"
+                >
+                  <Copy className="w-3 h-3" /> Salin Link
+                </button>
+                <button
+                  type="button"
+                  onClick={handleShareRoom}
+                  className="px-2.5 py-1 rounded-xl bg-purple-600 text-white text-[11px] font-display font-bold flex items-center gap-1 hover:bg-purple-700 shadow-sm"
+                  title="Bagikan Link Ruangan"
+                >
+                  <Share2 className="w-3 h-3" /> Bagikan
+                </button>
+              </div>
             </div>
           </div>
 

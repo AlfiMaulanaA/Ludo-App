@@ -14,7 +14,7 @@ import GameHeader from '../components/GameHeader';
 import OnlineLobby from '../components/OnlineLobby';
 import EmotePicker from '../components/EmotePicker';
 import ChatPanel from '../components/ChatPanel';
-import { PauseModal, WinnerModal, StatsModal, SettingsModal, HowToPlayModal, AchievementsModal } from '../components/Modals';
+import { PauseModal, WinnerModal, StatsModal, SettingsModal, HowToPlayModal, AchievementsModal, ConfirmModal } from '../components/Modals';
 
 import { Users, Bot as BotIcon, Globe, BarChart3, Award, Settings, HelpCircle, Play, Sparkles } from 'lucide-react';
 

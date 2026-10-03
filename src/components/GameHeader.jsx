@@ -1,7 +1,6 @@
-'use client';
-
-import React from 'react';
+import React, { useState } from 'react';
 import { Pause, Volume2, VolumeX, MessageSquare, Smile, Copy, ArrowLeft, LogOut } from 'lucide-react';
+import { copyToClipboard } from '../lib/ludo/clipboard';
 
 export default function GameHeader({
   game,
@@ -13,17 +12,24 @@ export default function GameHeader({
   onOpenEmotes,
   onBackToMenu
 }) {
+  const [copiedNotice, setCopiedNotice] = useState('');
   const activePlayer = game?.players?.[game?.currentPlayerIndex];
 
-  const copyRoomCode = () => {
+  const copyRoomCode = async () => {
     if (roomCode) {
-      navigator.clipboard.writeText(roomCode);
-      alert(`Kode Ruangan ${roomCode} berhasil disalin!`);
+      const ok = await copyToClipboard(roomCode);
+      setCopiedNotice(ok ? `Kode ${roomCode} disalin!` : 'Gagal menyalin kode');
+      setTimeout(() => setCopiedNotice(''), 2500);
     }
   };
 
   return (
-    <header className="w-full max-w-5xl mx-auto flex items-center justify-between gap-3 px-4 py-3 card mb-4">
+    <header className="w-full max-w-5xl mx-auto flex items-center justify-between gap-3 px-4 py-3 card mb-4 relative">
+      {copiedNotice && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-purple-600 text-white text-xs font-display font-black rounded-full shadow-md z-50 animate-fade-in">
+          {copiedNotice}
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <button
           type="button"

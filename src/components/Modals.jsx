@@ -313,3 +313,35 @@ export function AchievementsModal({ onClose }) {
     </div>
   );
 }
+
+/* CUSTOM CONFIRMATION MODAL */
+export function ConfirmModal({ title, message, confirmText = 'Ya, Keluar', cancelText = 'Batal', onConfirm, onCancel, isDanger = true }) {
+  return (
+    <div className="modal-backdrop z-[100]">
+      <div className="w-full max-w-sm card p-6 rounded-3xl border-2 border-slate-100 shadow-2xl text-center space-y-4 animate-pop-in">
+        <h3 className="text-lg font-display font-black text-slate-800">{title || 'Konfirmasi'}</h3>
+        <p className="text-xs font-display font-bold text-slate-600 leading-relaxed">
+          {message}
+        </p>
+
+        <div className="grid grid-cols-2 gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="btn btn-ghost py-3 rounded-2xl text-xs font-display font-bold"
+          >
+            {cancelText}
+          </button>
+
+          <button
+            type="button"
+            onClick={onConfirm}
+            className={`btn ${isDanger ? 'btn-red' : 'btn-purple'} py-3 rounded-2xl text-xs font-display uppercase tracking-wider font-black`}
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
