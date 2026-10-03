@@ -1,7 +1,6 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Key, Play, CheckCircle2, Copy, Crown, ArrowLeft } from 'lucide-react';
+import { Users, Plus, Key, Play, CheckCircle2, Copy, Crown, ArrowLeft, Edit3, Check } from 'lucide-react';
+import { readStorage, writeStorage } from '../lib/ludo/storage';
 
 export default function OnlineLobby({
   onBack,
@@ -9,15 +8,20 @@ export default function OnlineLobby({
   onJoinRoom,
   onQuickMatch,
   onSelectColor,
+  onUpdateName,
   roomState,
   onToggleReady,
   onStartGame,
   socketId,
   initialCode = ''
 }) {
+  const savedProfileName = typeof window !== 'undefined' ? readStorage('profileName', '') : '';
+
   const [mode, setMode] = useState(initialCode ? 'JOIN' : 'CHOICE'); // CHOICE | CREATE | JOIN | IN_ROOM | QUICK
-  const [hostName, setHostName] = useState('');
-  const [playerName, setPlayerName] = useState('');
+  const [hostName, setHostName] = useState(savedProfileName);
+  const [playerName, setPlayerName] = useState(savedProfileName);
+  const [editingName, setEditingName] = useState(false);
+  const [tempName, setTempName] = useState('');
   const [joinCode, setJoinCode] = useState(initialCode);
   const [playerCount, setPlayerCount] = useState(4);
   const [turnTimer, setTurnTimer] = useState(15);
@@ -37,6 +41,18 @@ export default function OnlineLobby({
     });
   };
 
+  const handleSaveNewName = () => {
+    if (!tempName.trim()) return;
+    const clean = tempName.trim().slice(0, 15);
+    writeStorage('profileName', clean);
+    if (onUpdateName) {
+      onUpdateName(clean, res => {
+        if (!res?.success) setError(res?.error || 'Gagal mengubah nama');
+      });
+    }
+    setEditingName(false);
+  };
+
   useEffect(() => {
     if (initialCode && !joinCode) setJoinCode(initialCode);
   }, [initialCode]);
@@ -44,11 +60,13 @@ export default function OnlineLobby({
   const handleCreate = e => {
     e.preventDefault();
     setError('');
-    if (!hostName.trim()) {
+    const name = hostName.trim();
+    if (!name) {
       setError('Masukkan nama kamu');
       return;
     }
-    onCreateRoom({ hostName: hostName.trim(), playerCount, turnTimer, botFill }, res => {
+    writeStorage('profileName', name);
+    onCreateRoom({ hostName: name, playerCount, turnTimer, botFill }, res => {
       if (res?.success) setMode('IN_ROOM');
       else setError(res?.error || 'Gagal membuat ruangan');
     });
@@ -57,11 +75,13 @@ export default function OnlineLobby({
   const handleJoin = e => {
     e.preventDefault();
     setError('');
-    if (!playerName.trim() || !joinCode.trim()) {
+    const name = playerName.trim();
+    if (!name || !joinCode.trim()) {
       setError('Masukkan nama dan kode ruangan');
       return;
     }
-    onJoinRoom({ roomCode: joinCode.trim().toUpperCase(), playerName: playerName.trim() }, res => {
+    writeStorage('profileName', name);
+    onJoinRoom({ roomCode: joinCode.trim().toUpperCase(), playerName: name }, res => {
       if (res?.success) setMode('IN_ROOM');
       else setError(res?.error || 'Gagal bergabung ke ruangan');
     });
@@ -70,11 +90,13 @@ export default function OnlineLobby({
   const handleQuick = e => {
     e.preventDefault();
     setError('');
-    if (!playerName.trim()) {
+    const name = playerName.trim();
+    if (!name) {
       setError('Masukkan nama kamu');
       return;
     }
-    onQuickMatch({ playerName: playerName.trim() }, res => {
+    writeStorage('profileName', name);
+    onQuickMatch({ playerName: name }, res => {
       if (res?.success) setMode('IN_ROOM');
       else setError(res?.error || 'Gagal mencari pertandingan acak');
     });
@@ -349,49 +371,89 @@ export default function OnlineLobby({
 
           {/* List of Players in Lobby */}
           <div className="space-y-2.5">
-            {currentRoom.players.map((p, idx) => (
-              <div
-                key={p.id || idx}
-                className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border-2 border-slate-100"
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-9 h-9 rounded-2xl flex items-center justify-center font-display font-bold text-white text-sm shadow-sm ${
-                      p.color === 'red'
-                        ? 'bg-rose-500'
-                        : p.color === 'green'
-                        ? 'bg-emerald-500'
-                        : p.color === 'yellow'
-                        ? 'bg-amber-400 text-slate-900'
-                        : 'bg-blue-500'
-                    }`}
-                  >
-                    {idx + 1}
-                  </div>
-                  <div>
-                    <div className="text-sm font-display font-extrabold text-slate-800 flex items-center gap-1.5">
-                      {p.name}
-                      {currentRoom.hostSocketId === p.socketId && (
-                        <Crown className="w-4 h-4 text-amber-500 fill-amber-400" />
-                      )}
+            {currentRoom.players.map((p, idx) => {
+              const isMe = p.socketId === socketId;
+              return (
+                <div
+                  key={p.id || idx}
+                  className={`flex items-center justify-between p-3.5 rounded-2xl border-2 ${
+                    isMe ? 'bg-purple-50/80 border-purple-300' : 'bg-slate-50 border-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-9 h-9 rounded-2xl flex items-center justify-center font-display font-bold text-white text-sm shadow-sm ${
+                        p.color === 'red'
+                          ? 'bg-rose-500'
+                          : p.color === 'green'
+                          ? 'bg-emerald-500'
+                          : p.color === 'yellow'
+                          ? 'bg-amber-400 text-slate-900'
+                          : 'bg-blue-500'
+                      }`}
+                    >
+                      {idx + 1}
                     </div>
-                    <div className="text-[10px] text-slate-400 font-bold uppercase">{p.type}</div>
+                    <div>
+                      {isMe && editingName ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            maxLength={15}
+                            value={tempName}
+                            onChange={e => setTempName(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleSaveNewName()}
+                            className="px-2 py-1 text-xs font-display font-bold border-2 border-purple-400 rounded-lg outline-none text-slate-800 bg-white"
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={handleSaveNewName}
+                            className="p-1 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600"
+                            title="Simpan Nama"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-sm font-display font-extrabold text-slate-800 flex items-center gap-1.5">
+                          {p.name}
+                          {isMe && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTempName(p.name);
+                                setEditingName(true);
+                              }}
+                              className="text-purple-600 hover:text-purple-800 p-0.5"
+                              title="Ubah Nama Kamu"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {currentRoom.hostSocketId === p.socketId && (
+                            <Crown className="w-4 h-4 text-amber-500 fill-amber-400" />
+                          )}
+                        </div>
+                      )}
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">{p.type} {isMe ? '(Kamu)' : ''}</div>
+                    </div>
+                  </div>
+
+                  <div>
+                    {p.isReady ? (
+                      <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300 text-xs font-display font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Ready
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1 rounded-full bg-slate-200 text-slate-500 text-xs font-display font-bold">
+                        Menunggu
+                      </span>
+                    )}
                   </div>
                 </div>
-
-                <div>
-                  {p.isReady ? (
-                    <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300 text-xs font-display font-bold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Ready
-                    </span>
-                  ) : (
-                    <span className="px-3 py-1 rounded-full bg-slate-200 text-slate-500 text-xs font-display font-bold">
-                      Menunggu
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* COLOR SELECTION FOR MY PLAYER */}

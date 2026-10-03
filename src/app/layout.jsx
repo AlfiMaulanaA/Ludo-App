@@ -1,14 +1,20 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Ludo App — Main Ludo Online & Offline',
+  title: 'Ludo App — Developed by maul.dev',
   description:
-    'Game Ludo modern yang colorful: Local Pass & Play, lawan Bot AI, dan multiplayer online real-time. Gratis dimainkan di browser.',
-  keywords: ['Ludo', 'game ludo online', 'board game', 'multiplayer', 'Next.js'],
+    'Game Ludo modern yang colorful oleh maul.dev: Local Pass & Play, lawan Bot AI, dan multiplayer online real-time. Gratis dimainkan di browser.',
+  keywords: ['Ludo', 'game ludo online', 'board game', 'multiplayer', 'Next.js', 'maul.dev'],
+  icons: {
+    icon: '/icon.jpeg',
+    shortcut: '/icon.jpeg',
+    apple: '/app-logo.jpeg'
+  },
   openGraph: {
-    title: 'Ludo App',
+    title: 'Ludo App — Developed by maul.dev',
     description: 'Main Ludo bareng teman — offline maupun online.',
-    type: 'website'
+    type: 'website',
+    images: ['/app-logo.jpeg']
   }
 };
 

@@ -12,8 +12,7 @@ const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
   const httpServer = createServer((req, res) => {
-    const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-    handle(req, res, parsedUrl);
+    handle(req, res);
   });
 
   const io = new Server(httpServer, {

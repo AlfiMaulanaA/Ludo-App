@@ -186,6 +186,24 @@ export function initSocketServer(io) {
       }
     });
 
+    // Update Player Name in Lobby
+    socket.on('UPDATE_NAME', ({ name }, callback) => {
+      const room = rooms.get(socket.roomCode);
+      if (!room || room.status !== 'LOBBY') {
+        return callback?.({ success: false, error: 'Tidak dapat mengubah nama saat permainan berlangsung' });
+      }
+      const cleanedName = (name || '').trim().slice(0, 15);
+      if (!cleanedName) {
+        return callback?.({ success: false, error: 'Nama tidak boleh kosong' });
+      }
+      const player = room.players.find(p => p.socketId === socket.id);
+      if (player) {
+        player.name = cleanedName;
+        io.to(room.code).emit('ROOM_UPDATED', getRoomState(room));
+        callback?.({ success: true, name: cleanedName });
+      }
+    });
+
     // Toggle Ready
     socket.on('TOGGLE_READY', () => {
       const room = rooms.get(socket.roomCode);

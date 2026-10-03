@@ -45,9 +45,12 @@ export default function GameHeader({
             <Copy className="w-3.5 h-3.5 text-purple-600 ml-0.5" />
           </div>
         ) : (
-          <span className="text-xl font-display font-black text-purple-600 tracking-tight">
-            LUDO <span className="text-amber-500">APP</span>
-          </span>
+          <div className="flex items-center gap-2">
+            <img src="/app-logo.jpeg" alt="Logo" className="w-7 h-7 rounded-xl object-cover border border-purple-200 shadow-sm" />
+            <span className="text-xl font-display font-black text-purple-600 tracking-tight">
+              LUDO <span className="text-amber-500">APP</span>
+            </span>
+          </div>
         )}
       </div>
 

@@ -484,15 +484,22 @@ export default function Home() {
 
       {/* MENU HUB */}
       {viewState === 'MENU' && (
-        <div className="w-full max-w-md mx-auto my-auto py-8 text-center space-y-6 view-enter">
-          <div className="space-y-3">
-            <div className="inline-flex p-4 rounded-3xl bg-amber-400 text-slate-950 shadow-lg animate-float">
-              <Sparkles className="w-12 h-12" />
+        <div className="w-full max-w-md mx-auto my-auto py-6 text-center space-y-6 view-enter">
+          <div className="space-y-3 flex flex-col items-center">
+            <div className="relative group">
+              <div className="w-28 h-28 rounded-3xl overflow-hidden border-4 border-white shadow-2xl ring-4 ring-purple-400/40 animate-float">
+                <img src="/app-logo.jpeg" alt="Ludo App Logo" className="w-full h-full object-cover" />
+              </div>
+              <div className="absolute -bottom-2 -right-2 p-2 rounded-2xl bg-amber-400 text-slate-950 shadow-md">
+                <Sparkles className="w-5 h-5" />
+              </div>
             </div>
-            <h1 className="text-4xl font-display font-black tracking-tight text-slate-900">
-              LUDO <span className="text-purple-600">APP</span>
-            </h1>
-            <p className="text-xs font-display font-bold text-slate-500">Offline Pass & Play • VS Bot AI • Online Realtime</p>
+            <div>
+              <h1 className="text-4xl font-display font-black tracking-tight text-slate-900">
+                LUDO <span className="text-purple-600">APP</span>
+              </h1>
+              <p className="text-xs font-display font-bold text-slate-500 mt-1">Offline Pass & Play • VS Bot AI • Online Realtime</p>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -554,6 +561,12 @@ export default function Home() {
                 <span className="text-[10px] font-display font-bold text-slate-700">{label}</span>
               </button>
             ))}
+          </div>
+
+          <div className="pt-3 text-center">
+            <span className="text-[11px] font-display font-extrabold text-slate-500 bg-white/90 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-slate-200 shadow-sm inline-flex items-center gap-1.5">
+              Developed by <span className="text-purple-600 font-black tracking-wide">maul.dev</span> 🚀
+            </span>
           </div>
         </div>
       )}
