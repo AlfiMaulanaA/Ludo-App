@@ -161,6 +161,8 @@ body {
 .board {
   position: relative;
   width: 100%;
+  max-width: min(88vw, 510px);
+  margin: 0 auto;
   aspect-ratio: 1 / 1;
   background: #ffffff;
   border-radius: 28px;

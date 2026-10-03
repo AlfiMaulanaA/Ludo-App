@@ -4,6 +4,22 @@ export class AudioManager {
     this.context = null;
     this.musicInterval = null;
     this.step = 0;
+    this.isUnlocked = false;
+
+    // Attach user gesture listener to unlock Web Audio API immediately on first tap/click
+    if (typeof window !== 'undefined') {
+      const unlockHandler = () => {
+        this.unlock();
+        if (this.isUnlocked) {
+          window.removeEventListener('pointerdown', unlockHandler);
+          window.removeEventListener('touchstart', unlockHandler);
+          window.removeEventListener('click', unlockHandler);
+        }
+      };
+      window.addEventListener('pointerdown', unlockHandler, { passive: true });
+      window.addEventListener('touchstart', unlockHandler, { passive: true });
+      window.addEventListener('click', unlockHandler, { passive: true });
+    }
   }
 
   unlock() {
@@ -15,44 +31,73 @@ export class AudioManager {
       }
     }
     if (this.context && this.context.state === 'suspended') {
-      this.context.resume().catch(() => {});
+      this.context.resume().then(() => {
+        this.isUnlocked = true;
+      }).catch(() => {});
+    } else if (this.context && this.context.state === 'running') {
+      this.isUnlocked = true;
     }
   }
 
   tone(frequency, duration, volume, type = 'sine') {
-    if (!this.context || this.settings.mute || !volume) return;
+    if (this.settings.mute || !volume) return;
+    this.unlock();
+    if (!this.context) return;
+
     try {
       const oscillator = this.context.createOscillator();
       const gain = this.context.createGain();
       const now = this.context.currentTime;
+
       oscillator.type = type;
       oscillator.frequency.value = frequency;
-      gain.gain.setValueAtTime((volume / 100) * 0.15, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      const gainVal = (volume / 100) * 0.18;
+      gain.gain.setValueAtTime(gainVal, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
       oscillator.connect(gain);
       gain.connect(this.context.destination);
-      oscillator.start();
+
+      oscillator.start(now);
       oscillator.stop(now + duration);
     } catch {
-      // Ignore Web Audio errors if audio context was closed
+      // Audio context error fallback
     }
   }
 
   play(type) {
     this.unlock();
     const soundMap = {
-      click: [520],
-      dice: [220, 330, 440, 550],
-      move: [660],
-      capture: [330, 180],
-      finish: [523, 659, 784],
-      victory: [523, 659, 784, 1047]
+      click: [{ freq: 520, duration: 0.08, type: 'sine' }],
+      dice: [
+        { freq: 240, duration: 0.08, type: 'triangle' },
+        { freq: 360, duration: 0.08, type: 'triangle' },
+        { freq: 480, duration: 0.08, type: 'triangle' },
+        { freq: 600, duration: 0.12, type: 'sine' }
+      ],
+      move: [{ freq: 659, duration: 0.12, type: 'sine' }],
+      capture: [
+        { freq: 440, duration: 0.1, type: 'sawtooth' },
+        { freq: 220, duration: 0.25, type: 'triangle' }
+      ],
+      finish: [
+        { freq: 523, duration: 0.12, type: 'triangle' },
+        { freq: 659, duration: 0.12, type: 'triangle' },
+        { freq: 784, duration: 0.25, type: 'sine' }
+      ],
+      victory: [
+        { freq: 523, duration: 0.15, type: 'triangle' },
+        { freq: 659, duration: 0.15, type: 'triangle' },
+        { freq: 784, duration: 0.15, type: 'triangle' },
+        { freq: 1047, duration: 0.4, type: 'sine' }
+      ]
     };
 
-    const notes = soundMap[type] || [440];
-    notes.forEach((freq, index) => {
+    const notes = soundMap[type] || [{ freq: 440, duration: 0.15, type: 'sine' }];
+    notes.forEach((note, index) => {
       setTimeout(() => {
-        this.tone(freq, 0.18, this.settings.sfxVolume ?? 65, 'triangle');
+        this.tone(note.freq, note.duration, this.settings.sfxVolume ?? 65, note.type);
       }, index * 75);
     });
 
@@ -68,7 +113,7 @@ export class AudioManager {
     this.musicInterval = setInterval(() => {
       if (!this.settings.mute && (this.settings.musicVolume ?? 20) > 0) {
         const freq = melody[this.step++ % melody.length];
-        this.tone(freq, 0.7, this.settings.musicVolume, 'sine');
+        this.tone(freq, 0.6, this.settings.musicVolume, 'sine');
       }
     }, 700);
   }
