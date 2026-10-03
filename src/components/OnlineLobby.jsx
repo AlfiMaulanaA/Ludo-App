@@ -7,22 +7,29 @@ export default function OnlineLobby({
   onBack,
   onCreateRoom,
   onJoinRoom,
+  onQuickMatch,
   roomState,
   onToggleReady,
   onStartGame,
-  socketId
+  socketId,
+  initialCode = ''
 }) {
-  const [mode, setMode] = useState('CHOICE'); // CHOICE | CREATE | JOIN | IN_ROOM
+  const [mode, setMode] = useState(initialCode ? 'JOIN' : 'CHOICE'); // CHOICE | CREATE | JOIN | IN_ROOM | QUICK
   const [hostName, setHostName] = useState('');
   const [playerName, setPlayerName] = useState('');
-  const [joinCode, setJoinCode] = useState('');
+  const [joinCode, setJoinCode] = useState(initialCode);
   const [playerCount, setPlayerCount] = useState(4);
   const [turnTimer, setTurnTimer] = useState(15);
   const [botFill, setBotFill] = useState(true);
   const [error, setError] = useState('');
+  const [copySuccess, setCopySuccess] = useState('');
 
   const currentRoom = roomState;
   const isHost = currentRoom && currentRoom.hostSocketId === socketId;
+
+  useEffect(() => {
+    if (initialCode && !joinCode) setJoinCode(initialCode);
+  }, [initialCode]);
 
   const handleCreate = e => {
     e.preventDefault();
@@ -50,12 +57,46 @@ export default function OnlineLobby({
     });
   };
 
+  const handleQuick = e => {
+    e.preventDefault();
+    setError('');
+    if (!playerName.trim()) {
+      setError('Masukkan nama kamu');
+      return;
+    }
+    onQuickMatch({ playerName: playerName.trim() }, res => {
+      if (res?.success) setMode('IN_ROOM');
+      else setError(res?.error || 'Gagal mencari pertandingan acak');
+    });
+  };
+
+  const copyDirectLink = () => {
+    if (!currentRoom?.code) return;
+    const directUrl = `${window.location.origin}/?room=${currentRoom.code}`;
+    navigator.clipboard.writeText(directUrl);
+    setCopySuccess('Link direct berhasil disalin!');
+    setTimeout(() => setCopySuccess(''), 3000);
+  };
+
+  const copyCodeOnly = () => {
+    if (!currentRoom?.code) return;
+    navigator.clipboard.writeText(currentRoom.code);
+    setCopySuccess(`Kode ${currentRoom.code} berhasil disalin!`);
+    setTimeout(() => setCopySuccess(''), 3000);
+  };
+
   useEffect(() => {
     if (currentRoom && mode !== 'IN_ROOM') setMode('IN_ROOM');
   }, [currentRoom, mode]);
 
   return (
     <div className="w-full max-w-lg mx-auto p-6 card space-y-6 view-enter">
+      {copySuccess && (
+        <div className="p-2.5 rounded-xl bg-emerald-500 text-white text-xs font-display font-black text-center shadow-md animate-fade-in">
+          {copySuccess}
+        </div>
+      )}
+
       {/* CHOICE MODE */}
       {mode === 'CHOICE' && (
         <div className="space-y-6">
@@ -69,14 +110,27 @@ export default function OnlineLobby({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-3.5">
+            <button
+              type="button"
+              onClick={() => setMode('QUICK')}
+              className="btn btn-yellow p-4 rounded-2xl flex items-center justify-between text-left shadow-card hover:scale-[1.02]"
+            >
+              <div>
+                <div className="text-base font-display font-black flex items-center gap-2">
+                  <Play className="w-5 h-5 fill-slate-950" /> Quick Match (Gabung Acak)
+                </div>
+                <div className="text-xs opacity-90 font-semibold font-body">Cari ruangan publik yang tersedia secara cepat</div>
+              </div>
+            </button>
+
             <button
               type="button"
               onClick={() => setMode('CREATE')}
-              className="btn btn-purple p-5 rounded-2xl flex items-center justify-between text-left shadow-card hover:scale-[1.02]"
+              className="btn btn-purple p-4 rounded-2xl flex items-center justify-between text-left shadow-card hover:scale-[1.02]"
             >
               <div>
-                <div className="text-lg font-display font-black flex items-center gap-2">
+                <div className="text-base font-display font-black flex items-center gap-2">
                   <Plus className="w-5 h-5" /> Buat Ruangan Baru
                 </div>
                 <div className="text-xs opacity-90 font-semibold font-body">Host room private dan bagikan kode ke teman</div>
@@ -86,10 +140,10 @@ export default function OnlineLobby({
             <button
               type="button"
               onClick={() => setMode('JOIN')}
-              className="btn btn-green p-5 rounded-2xl flex items-center justify-between text-left shadow-card hover:scale-[1.02]"
+              className="btn btn-green p-4 rounded-2xl flex items-center justify-between text-left shadow-card hover:scale-[1.02]"
             >
               <div>
-                <div className="text-lg font-display font-black flex items-center gap-2">
+                <div className="text-base font-display font-black flex items-center gap-2">
                   <Key className="w-5 h-5" /> Gabung Kode Ruangan
                 </div>
                 <div className="text-xs opacity-90 font-semibold font-body">Masukkan 6 karakter kode room milik temanmu</div>
@@ -97,6 +151,40 @@ export default function OnlineLobby({
             </button>
           </div>
         </div>
+      )}
+
+      {/* QUICK MATCH FORM */}
+      {mode === 'QUICK' && (
+        <form onSubmit={handleQuick} className="space-y-5">
+          <div className="flex items-center justify-between border-b-2 border-slate-100 pb-3">
+            <h3 className="text-lg font-display font-bold text-slate-800">Quick Matchmaking</h3>
+            <button type="button" onClick={() => setMode('CHOICE')} className="text-xs font-bold text-slate-400 hover:text-slate-600">
+              Batal
+            </button>
+          </div>
+
+          {error && <div className="p-3 rounded-xl bg-rose-50 border-2 border-rose-200 text-rose-600 text-xs font-bold">{error}</div>}
+
+          <div>
+            <label className="block text-xs font-display font-bold text-slate-600 mb-1">Nama Pemain (Kamu):</label>
+            <input
+              type="text"
+              required
+              maxLength={15}
+              value={playerName}
+              onChange={e => setPlayerName(e.target.value)}
+              placeholder="Contoh: Alex"
+              className="input"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="btn btn-yellow w-full py-3.5 rounded-2xl text-sm font-display uppercase tracking-wider flex items-center justify-center gap-2"
+          >
+            <Play className="w-5 h-5 fill-slate-950" /> Cari Pertandingan
+          </button>
+        </form>
       )}
 
       {/* CREATE ROOM FORM */}
@@ -226,20 +314,26 @@ export default function OnlineLobby({
           <div className="flex items-center justify-between border-b-2 border-slate-100 pb-3">
             <div>
               <div className="text-xs font-display font-bold text-slate-400">Kode Ruangan:</div>
-              <div
-                onClick={() => {
-                  navigator.clipboard.writeText(currentRoom.code);
-                  alert(`Kode Room ${currentRoom.code} berhasil disalin!`);
-                }}
-                className="text-3xl font-display font-black text-purple-600 flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-              >
-                {currentRoom.code} <Copy className="w-5 h-5 text-slate-400" />
+              <div className="flex items-center gap-2">
+                <span onClick={copyCodeOnly} className="text-3xl font-display font-black text-purple-600 cursor-pointer hover:opacity-80 transition-opacity">
+                  {currentRoom.code}
+                </span>
+                <button type="button" onClick={copyCodeOnly} className="icon-btn p-1.5" title="Salin Kode">
+                  <Copy className="w-4 h-4 text-purple-600" />
+                </button>
               </div>
             </div>
-            <div className="text-right">
-              <span className="text-xs font-display font-bold text-slate-600 chip px-3 py-1">
+            <div className="text-right space-y-1">
+              <span className="text-xs font-display font-bold text-slate-600 chip px-3 py-1 block">
                 {currentRoom.players.length}/{currentRoom.config?.playerCount || 4} Pemain
               </span>
+              <button
+                type="button"
+                onClick={copyDirectLink}
+                className="text-[11px] font-display font-extrabold text-purple-600 hover:underline flex items-center gap-1 justify-end"
+              >
+                <Copy className="w-3 h-3" /> Salin Direct Link URL
+              </button>
             </div>
           </div>
 

@@ -74,6 +74,7 @@ export default function Home() {
   const [botCount, setBotCount] = useState(3);
   const [botDifficulty, setBotDifficulty] = useState('medium');
   const [setupTimer, setSetupTimer] = useState(15);
+  const [initialRoomCode, setInitialRoomCode] = useState('');
 
   const audioRef = useRef(null);
   const gameRef = useRef(null);
@@ -85,12 +86,25 @@ export default function Home() {
   const isMyTurn = !!game && game.turnState !== 'GAME_OVER' && !!activePlayer && (isOnline ? activePlayer.id === myOnlinePlayerId && activePlayer.type === 'human' : activePlayer.type === 'human');
   const paused = showPause || showSettings;
 
-  // Audio & persisted settings initialization
+  // Audio, persisted settings & URL search param room detection
   useEffect(() => {
     audioRef.current = new AudioManager(settings);
     const saved = readStorage('settings');
     if (saved) setSettings(s => ({ ...s, ...saved }));
     setHasSaved(!!loadSavedGame());
+
+    // Check for ?room=CODE or ?code=CODE search parameter
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlCode = params.get('room') || params.get('code');
+      if (urlCode) {
+        const cleaned = urlCode.toUpperCase().trim();
+        setInitialRoomCode(cleaned);
+        connectSocket();
+        setViewState('ONLINE_LOBBY');
+      }
+    }
+
     return () => audioRef.current?.stopMusic();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -369,6 +383,7 @@ export default function Home() {
   };
   const handleCreateOnlineRoom = (opts, cb) => getSocket()?.emit('CREATE_ROOM', opts, cb);
   const handleJoinOnlineRoom = (opts, cb) => getSocket()?.emit('JOIN_ROOM', opts, cb);
+  const handleQuickMatchOnlineRoom = (opts, cb) => getSocket()?.emit('QUICK_MATCH', opts, cb);
   const handleToggleReady = () => getSocket()?.emit('TOGGLE_READY');
   const handleStartOnlineGame = () =>
     getSocket()?.emit(
@@ -544,10 +559,12 @@ export default function Home() {
           onBack={leaveToMenu}
           onCreateRoom={handleCreateOnlineRoom}
           onJoinRoom={handleJoinOnlineRoom}
+          onQuickMatch={handleQuickMatchOnlineRoom}
           roomState={onlineRoomState}
           onToggleReady={handleToggleReady}
           onStartGame={handleStartOnlineGame}
           socketId={socketId}
+          initialCode={initialRoomCode}
         />
       )}
 
