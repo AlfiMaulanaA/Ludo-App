@@ -5,15 +5,14 @@ export class AudioManager {
     this.musicInterval = null;
     this.step = 0;
     this.isUnlocked = false;
+    this.wantsMusic = true;
 
     // Attach user gesture listener to unlock Web Audio API immediately on first tap/click
     if (typeof window !== 'undefined') {
       const unlockHandler = () => {
         this.unlock();
-        if (this.isUnlocked) {
-          window.removeEventListener('pointerdown', unlockHandler);
-          window.removeEventListener('touchstart', unlockHandler);
-          window.removeEventListener('click', unlockHandler);
+        if (this.wantsMusic) {
+          this.startMusic();
         }
       };
       window.addEventListener('pointerdown', unlockHandler, { passive: true });
@@ -111,18 +110,20 @@ export class AudioManager {
   }
 
   startMusic() {
+    this.wantsMusic = true;
     this.unlock();
     if (this.musicInterval) return;
-    const melody = [262, 330, 392, 330, 294, 349, 440, 349];
+    const melody = [262, 330, 392, 523, 392, 330, 294, 349, 440, 587, 440, 349];
     this.musicInterval = setInterval(() => {
       if (!this.settings.mute && (this.settings.musicVolume ?? 20) > 0) {
         const freq = melody[this.step++ % melody.length];
-        this.tone(freq, 0.6, this.settings.musicVolume, 'sine');
+        this.tone(freq, 0.5, (this.settings.musicVolume ?? 20) * 0.8, 'sine');
       }
-    }, 700);
+    }, 600);
   }
 
   stopMusic() {
+    this.wantsMusic = false;
     if (this.musicInterval) {
       clearInterval(this.musicInterval);
       this.musicInterval = null;

@@ -71,9 +71,11 @@ export default function Home() {
 
   // Setup
   const [localPlayerCount, setLocalPlayerCount] = useState(4);
+  const [localPlayerNames, setLocalPlayerNames] = useState(['Pemain 1', 'Pemain 2', 'Pemain 3', 'Pemain 4']);
   const [localPlayerColors, setLocalPlayerColors] = useState(['red', 'green', 'yellow', 'blue']);
   const [botCount, setBotCount] = useState(3);
   const [botDifficulty, setBotDifficulty] = useState('medium');
+  const [humanBotName, setHumanBotName] = useState('Kamu');
   const [humanBotColor, setHumanBotColor] = useState('red');
   const [setupTimer, setSetupTimer] = useState(15);
   const [initialRoomCode, setInitialRoomCode] = useState('');
@@ -91,6 +93,7 @@ export default function Home() {
   // Audio, persisted settings & URL search param room detection
   useEffect(() => {
     audioRef.current = new AudioManager(settings);
+    audioRef.current.startMusic();
     const saved = readStorage('settings');
     if (saved) setSettings(s => ({ ...s, ...saved }));
     setHasSaved(!!loadSavedGame());
@@ -331,7 +334,7 @@ export default function Home() {
 
   const startLocalGame = () => {
     const players = Array.from({ length: localPlayerCount }, (_, i) => ({
-      name: `Pemain ${i + 1}`,
+      name: localPlayerNames[i]?.trim() || `Pemain ${i + 1}`,
       type: 'human',
       color: localPlayerColors[i]
     }));
@@ -342,7 +345,7 @@ export default function Home() {
     const allColors = ['red', 'green', 'yellow', 'blue'];
     const remainingColors = allColors.filter(c => c !== humanBotColor);
     const players = [
-      { name: 'Kamu', type: 'human', color: humanBotColor },
+      { name: humanBotName?.trim() || 'Kamu', type: 'human', color: humanBotColor },
       ...Array.from({ length: botCount }, (_, i) => ({
         name: `Bot ${i + 1}`,
         type: 'bot',
@@ -581,12 +584,23 @@ export default function Home() {
           </div>
 
           <div>
-            <label className="block text-xs font-display font-bold text-slate-600 mb-2">Warna Pemain</label>
-            <div className="space-y-2">
+            <label className="block text-xs font-display font-bold text-slate-600 mb-2">Nama & Warna Pemain</label>
+            <div className="space-y-2.5">
               {Array.from({ length: localPlayerCount }).map((_, idx) => (
-                <div key={idx} className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 border border-slate-200">
-                  <span className="text-xs font-display font-extrabold text-slate-700">Pemain {idx + 1}</span>
-                  <div className="flex gap-1.5">
+                <div key={idx} className="flex items-center gap-2 p-2.5 rounded-2xl bg-slate-50 border border-slate-200">
+                  <input
+                    type="text"
+                    maxLength={15}
+                    value={localPlayerNames[idx] || ''}
+                    onChange={e => {
+                      const updated = [...localPlayerNames];
+                      updated[idx] = e.target.value;
+                      setLocalPlayerNames(updated);
+                    }}
+                    placeholder={`Pemain ${idx + 1}`}
+                    className="input py-1.5 px-3 text-xs font-display font-bold text-slate-800 bg-white"
+                  />
+                  <div className="flex gap-1 shrink-0">
                     {[
                       { color: 'red', bg: 'bg-rose-500' },
                       { color: 'green', bg: 'bg-emerald-500' },
@@ -645,6 +659,17 @@ export default function Home() {
       {viewState === 'BOT_SETUP' && (
         <div className="w-full max-w-md mx-auto my-auto p-6 card rounded-3xl space-y-5 view-enter">
           <h2 className="text-xl font-display font-black text-emerald-600">Setup VS Bot AI</h2>
+          <div>
+            <label className="block text-xs font-display font-bold text-slate-600 mb-1">Nama Pemain (Kamu)</label>
+            <input
+              type="text"
+              maxLength={15}
+              value={humanBotName}
+              onChange={e => setHumanBotName(e.target.value)}
+              placeholder="Kamu"
+              className="input text-xs font-display font-bold text-slate-800 bg-white"
+            />
+          </div>
           <div>
             <label className="block text-xs font-display font-bold text-slate-600 mb-2">Jumlah Bot Lawan</label>
             <Segmented options={[1, 2, 3]} value={botCount} onChange={setBotCount} format={n => `${n} Bot`} />
