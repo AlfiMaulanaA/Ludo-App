@@ -91,6 +91,10 @@ export class AudioManager {
         { freq: 659, duration: 0.15, type: 'triangle' },
         { freq: 784, duration: 0.15, type: 'triangle' },
         { freq: 1047, duration: 0.4, type: 'sine' }
+      ],
+      tickWarning: [
+        { freq: 880, duration: 0.06, type: 'sine' },
+        { freq: 1100, duration: 0.06, type: 'triangle' }
       ]
     };
 

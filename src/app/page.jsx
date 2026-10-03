@@ -297,8 +297,22 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [deadline, paused, viewState, applyAction]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const lastPlayedSecondRef = useRef(null);
   const timerSeconds = deadline && activePlayer?.type === 'human' && game?.turnState !== 'GAME_OVER' ? Math.max(0, Math.ceil((deadline - now) / 1000)) : 0;
   const maxTimerSeconds = game?.settings?.turnTimer || 15;
+
+  // Sound warning alert when turn timer <= 5s
+  useEffect(() => {
+    if (viewState !== 'GAME' || !deadline || game?.turnState === 'GAME_OVER' || paused) return;
+    if (timerSeconds <= 5 && timerSeconds > 0 && timerSeconds !== lastPlayedSecondRef.current) {
+      lastPlayedSecondRef.current = timerSeconds;
+      audioRef.current?.play('tickWarning');
+    }
+  }, [timerSeconds, viewState, deadline, game?.turnState, paused]);
+
+  useEffect(() => {
+    lastPlayedSecondRef.current = null;
+  }, [turnKey]);
 
   // Starters
   const beginGame = config => {
