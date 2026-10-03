@@ -1,0 +1,13 @@
+// Room transport for local tabs and online deployments. The host is authoritative:
+// clients send commands, host validates them through the same engine, then broadcasts snapshots.
+export class MultiplayerSession {
+  constructor({room,role='host',url='',onState,onAction,onStatus}){this.room=room.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8)||'LUDO';this.role=role;this.url=url;this.onState=onState;this.onAction=onAction;this.onStatus=onStatus;this.channel=null;this.socket=null;this.clientId=crypto.randomUUID?.()||String(Math.random());}
+  connect(){if(this.url){try{this.socket=new WebSocket(this.url);this.socket.onopen=()=>this.hello();this.socket.onmessage=e=>this.receive(e.data);this.socket.onclose=()=>this.onStatus?.('Koneksi online terputus');this.socket.onerror=()=>this.onStatus?.('Koneksi online gagal');}catch{this.onStatus?.('WebSocket tidak tersedia');}}else if('BroadcastChannel' in window){this.channel=new BroadcastChannel(`ludo-room-${this.room}`);this.channel.onmessage=e=>this.receive(e.data);this.hello();}else this.onStatus?.('Browser tidak mendukung room lokal');return this;}
+  hello(){this.send({type:'HELLO',room:this.room,clientId:this.clientId,role:this.role});this.onStatus?.(`${this.url?'Online':'Offline antar-tab'} · Room ${this.room}`);}
+  send(message){const packet=JSON.stringify({...message,room:this.room,from:this.clientId});if(this.socket?.readyState===1)this.socket.send(packet);else this.channel?.postMessage(packet);}
+  receive(raw){let message;try{message=typeof raw==='string'?JSON.parse(raw):raw?.data?JSON.parse(raw.data):raw;}catch{return;}if(!message||message.room!==this.room||message.from===this.clientId)return;if(message.type==='HELLO'&&this.role==='host'){this.send({type:'STATE_REQUESTED'});return;}if(message.type==='STATE'&&this.role==='client')this.onState?.(message.state);if(message.type==='ACTION'&&this.role==='host')this.onAction?.(message.action,message.from);}
+  broadcast(state){if(this.role==='host')this.send({type:'STATE',state});}
+  action(action){if(this.role==='client')this.send({type:'ACTION',action});}
+  close(){this.channel?.close();this.socket?.close();this.channel=null;this.socket=null;}
+}
+export function createRelayServer(port=8787){return `// Minimal Node relay: node server.js\nimport {WebSocketServer} from 'ws'; const wss=new WebSocketServer({port:${port}}); const rooms=new Map(); wss.on('connection',ws=>{ws.on('message',raw=>{let m;try{m=JSON.parse(raw)}catch{return}if(!m.room)return;const peers=rooms.get(m.room)||new Set();peers.add(ws);rooms.set(m.room,peers);for(const peer of peers)if(peer!==ws&&peer.readyState===1)peer.send(raw)});ws.on('close',()=>{for(const peers of rooms.values())peers.delete(ws)})}); console.log('Ludo relay on ws://localhost:${port}');`;}
