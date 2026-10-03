@@ -14,7 +14,7 @@ import GameHeader from '../components/GameHeader';
 import OnlineLobby from '../components/OnlineLobby';
 import EmotePicker from '../components/EmotePicker';
 import ChatPanel from '../components/ChatPanel';
-import { PauseModal, WinnerModal, StatsModal, SettingsModal, HowToPlayModal, AchievementsModal, ConfirmModal } from '../components/Modals';
+import { PauseModal, WinnerModal, StatsModal, SettingsModal, HowToPlayModal, AchievementsModal, ConfirmModal, ExitModal } from '../components/Modals';
 
 import { Users, Bot as BotIcon, Globe, BarChart3, Award, Settings, HelpCircle, Play, Sparkles } from 'lucide-react';
 
@@ -376,17 +376,26 @@ export default function Home() {
     setShownDice(null);
   };
 
-  const leaveToMenu = () => {
+  const leaveToMenu = (shouldClearSaved = false) => {
+    if (shouldClearSaved) {
+      clearSavedGame();
+      setHasSaved(false);
+    } else if (game && !game.isOnlineMode && game.turnState !== 'GAME_OVER') {
+      saveGame(game);
+      setHasSaved(true);
+    }
+
     if (game?.isOnlineMode || viewState === 'ONLINE_LOBBY') {
       disconnectSocket();
       setOnlineRoomState(null);
       setOnlineMessages([]);
       setSocketId(null);
     }
-    audioRef.current?.stopMusic();
+    audioRef.current?.play('click');
     setGame(null);
     setDeadline(null);
     setShowPause(false);
+    setShowExitConfirm(false);
     setViewState('MENU');
   };
 
@@ -811,20 +820,10 @@ export default function Home() {
       )}
 
       {showExitConfirm && (
-        <ConfirmModal
-          title="Keluar dari Permainan?"
-          message={
-            isOnline
-              ? "Apakah kamu yakin ingin keluar dari ruangan ini? Tempatmu akan digantikan oleh Bot AI."
-              : "Apakah kamu yakin ingin keluar ke menu utama? Permainan offline kamu akan disimpan dan bisa dilanjutkan nanti."
-          }
-          confirmText="Ya, Keluar"
-          cancelText="Batal"
-          isDanger={true}
-          onConfirm={() => {
-            setShowExitConfirm(false);
-            leaveToMenu();
-          }}
+        <ExitModal
+          isOnline={isOnline}
+          onSaveAndExit={() => leaveToMenu(false)}
+          onDeleteAndExit={() => leaveToMenu(true)}
           onCancel={() => setShowExitConfirm(false)}
         />
       )}

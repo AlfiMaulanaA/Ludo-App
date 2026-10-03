@@ -345,3 +345,66 @@ export function ConfirmModal({ title, message, confirmText = 'Ya, Keluar', cance
     </div>
   );
 }
+
+/* EXIT GAME MODAL WITH 2 CHOICES (SAVE & EXIT vs PERMANENT DELETE & EXIT) */
+export function ExitModal({ isOnline, onSaveAndExit, onDeleteAndExit, onCancel }) {
+  return (
+    <div className="modal-backdrop z-[100]">
+      <div className="w-full max-w-sm card p-6 rounded-3xl border-2 border-slate-100 shadow-2xl text-center space-y-4 animate-pop-in">
+        <h3 className="text-xl font-display font-black text-rose-600 uppercase tracking-wider">
+          Keluar Permainan
+        </h3>
+        <p className="text-xs font-display font-bold text-slate-600 leading-relaxed">
+          {isOnline
+            ? "Apakah kamu yakin ingin keluar dari ruangan ini? Tempatmu akan digantikan oleh Bot AI."
+            : "Pilih tindakan untuk keluar dari permainan:"}
+        </p>
+
+        {isOnline ? (
+          <div className="space-y-2.5 pt-2">
+            <button
+              type="button"
+              onClick={onDeleteAndExit}
+              className="btn btn-red w-full py-3 rounded-2xl text-xs font-display uppercase tracking-wider font-black"
+            >
+              🚪 Keluar dari Room
+            </button>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="btn btn-ghost w-full py-2.5 rounded-2xl text-xs font-display font-bold"
+            >
+              Batal
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2.5 pt-2">
+            <button
+              type="button"
+              onClick={onSaveAndExit}
+              className="btn btn-purple w-full py-3 rounded-2xl text-xs font-display uppercase tracking-wider font-black flex items-center justify-center gap-2"
+            >
+              💾 Simpan & Keluar
+            </button>
+
+            <button
+              type="button"
+              onClick={onDeleteAndExit}
+              className="btn btn-red w-full py-3 rounded-2xl text-xs font-display uppercase tracking-wider font-black flex items-center justify-center gap-2"
+            >
+              🗑️ Hapus & Keluar Permanen
+            </button>
+
+            <button
+              type="button"
+              onClick={onCancel}
+              className="btn btn-ghost w-full py-2.5 rounded-2xl text-xs font-display font-bold"
+            >
+              Batal
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
