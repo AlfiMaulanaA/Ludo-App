@@ -98,6 +98,70 @@ export function initSocketServer(io) {
       callback?.({ success: true, roomCode: code, player: newPlayer, roomState: getRoomState(room) });
     });
 
+    // Quick Matchmaking (Find or Create open room)
+    socket.on('QUICK_MATCH', ({ playerName }, callback) => {
+      // Look for open room with space
+      let targetRoom = null;
+      for (const room of rooms.values()) {
+        if (room.status === 'LOBBY' && room.players.filter(p => p.type === 'human').length < room.config.playerCount) {
+          targetRoom = room;
+          break;
+        }
+      }
+
+      if (targetRoom) {
+        // Join existing
+        const playerIndex = targetRoom.players.length;
+        const playerColor = COLORS[playerIndex];
+        const newPlayer = {
+          socketId: socket.id,
+          id: `p${playerIndex}`,
+          name: playerName || `Pemain ${playerIndex + 1}`,
+          color: playerColor,
+          type: 'human',
+          isReady: true,
+          isConnected: true
+        };
+        targetRoom.players.push(newPlayer);
+        socket.join(targetRoom.code);
+        socket.roomCode = targetRoom.code;
+        socket.playerId = newPlayer.id;
+
+        io.to(targetRoom.code).emit('ROOM_UPDATED', getRoomState(targetRoom));
+        callback?.({ success: true, roomCode: targetRoom.code, player: newPlayer, roomState: getRoomState(targetRoom) });
+      } else {
+        // Create new
+        const roomCode = generateRoomCode();
+        const playerColor = COLORS[0];
+        const hostPlayer = {
+          socketId: socket.id,
+          id: `p0`,
+          name: playerName || 'Pemain 1',
+          color: playerColor,
+          type: 'human',
+          isReady: true,
+          isConnected: true
+        };
+        const room = {
+          code: roomCode,
+          hostSocketId: socket.id,
+          status: 'LOBBY',
+          config: { playerCount: 4, turnTimer: 15, botFill: true },
+          players: [hostPlayer],
+          game: null,
+          afk: {},
+          autoTimer: null,
+          chat: []
+        };
+        rooms.set(roomCode, room);
+        socket.join(roomCode);
+        socket.roomCode = roomCode;
+        socket.playerId = hostPlayer.id;
+
+        callback?.({ success: true, roomCode, player: hostPlayer, roomState: getRoomState(room) });
+      }
+    });
+
     // Toggle Ready
     socket.on('TOGGLE_READY', () => {
       const room = rooms.get(socket.roomCode);

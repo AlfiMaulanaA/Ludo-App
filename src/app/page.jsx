@@ -52,11 +52,12 @@ export default function Home() {
   const [deadline, setDeadline] = useState(null);
   const [now, setNow] = useState(Date.now());
 
-  // Online
+  // Online & Reactions State
   const [onlineRoomState, setOnlineRoomState] = useState(null);
   const [socketId, setSocketId] = useState(null);
   const [onlineMessages, setOnlineMessages] = useState([]);
   const [floatingEmotes, setFloatingEmotes] = useState([]);
+  const [speechBubbles, setSpeechBubbles] = useState({}); // { playerId: text }
   const [notice, setNotice] = useState('');
 
   // Modals
@@ -72,7 +73,7 @@ export default function Home() {
   const [localPlayerCount, setLocalPlayerCount] = useState(4);
   const [botCount, setBotCount] = useState(3);
   const [botDifficulty, setBotDifficulty] = useState('medium');
-  const [setupTimer, setSetupTimer] = useState(0);
+  const [setupTimer, setSetupTimer] = useState(15);
 
   const audioRef = useRef(null);
   const gameRef = useRef(null);
@@ -97,6 +98,19 @@ export default function Home() {
   useEffect(() => {
     if (audioRef.current) audioRef.current.settings = settings;
   }, [settings]);
+
+  const triggerSpeechBubble = (playerId, text) => {
+    if (!playerId) return;
+    setSpeechBubbles(prev => ({ ...prev, [playerId]: text }));
+    audioRef.current?.play('click');
+    setTimeout(() => {
+      setSpeechBubbles(prev => {
+        const next = { ...prev };
+        if (next[playerId] === text) delete next[playerId];
+        return next;
+      });
+    }, 3500);
+  };
 
   const playEvents = useCallback((g, lastAction) => {
     const audio = audioRef.current;
@@ -145,9 +159,14 @@ export default function Home() {
     const onEmote = ({ playerId, emote }) => {
       const id = `${Date.now()}-${Math.random()}`;
       setFloatingEmotes(prev => [...prev, { id, playerId, emote }]);
+      triggerSpeechBubble(playerId, emote);
       setTimeout(() => setFloatingEmotes(prev => prev.filter(x => x.id !== id)), 2500);
     };
-    const onChat = msg => setOnlineMessages(prev => [...prev.slice(-49), msg]);
+    const onChat = msg => {
+      setOnlineMessages(prev => [...prev.slice(-49), msg]);
+      const senderPlayer = gameRef.current?.players.find(p => p.name === msg.sender);
+      if (senderPlayer) triggerSpeechBubble(senderPlayer.id, msg.text);
+    };
     const onLeft = ({ name, reason, roomState }) => {
       if (roomState) setOnlineRoomState(roomState);
       setNotice(reason === 'AFK' ? `${name} tidak aktif — bot mengambil alih.` : `${name} terputus — bot mengambil alih.`);
@@ -263,6 +282,7 @@ export default function Home() {
   }, [deadline, paused, viewState, applyAction]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const timerSeconds = deadline && activePlayer?.type === 'human' && game?.turnState !== 'GAME_OVER' ? Math.max(0, Math.ceil((deadline - now) / 1000)) : 0;
+  const maxTimerSeconds = game?.settings?.turnTimer || 15;
 
   // Starters
   const beginGame = config => {
@@ -356,8 +376,22 @@ export default function Home() {
       { enableBlockRule: settings.enableBlockRule, tripleSix: settings.tripleSix, bonusTurnOnCapture: settings.bonusTurnOnCapture },
       res => res && !res.success && setNotice(res.error)
     );
-  const handleSendEmote = emote => getSocket()?.emit('SEND_EMOTE', { emote });
-  const handleSendChat = text => getSocket()?.emit('SEND_CHAT', { text });
+
+  const handleSendEmote = emote => {
+    if (game?.isOnlineMode) {
+      getSocket()?.emit('SEND_EMOTE', { emote });
+    } else if (activePlayer) {
+      triggerSpeechBubble(activePlayer.id, emote);
+    }
+  };
+
+  const handleSendChatMessage = text => {
+    if (game?.isOnlineMode) {
+      getSocket()?.emit('SEND_CHAT', { text });
+    } else if (activePlayer) {
+      triggerSpeechBubble(activePlayer.id, text);
+    }
+  };
 
   const validMoves = game && isMyTurn && game.turnState === 'SELECTING_PIECE' ? getValidMoves(game) : [];
   const validMovePieceIds = validMoves.map(m => m.id);
@@ -526,15 +560,23 @@ export default function Home() {
             onToggleMute={toggleMute}
             isMuted={!!settings.mute}
             roomCode={isOnline ? onlineRoomState?.code : null}
-            onOpenEmotes={isOnline ? () => setShowEmotes(true) : null}
-            onOpenChat={isOnline ? () => setShowChat(true) : null}
+            onOpenEmotes={() => setShowEmotes(true)}
+            onOpenChat={() => setShowChat(true)}
             onBackToMenu={() => (isOnline ? setShowPause(true) : leaveToMenu())}
           />
 
           <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
             <div className="lg:col-span-3 grid grid-cols-2 lg:grid-cols-1 gap-3">
               {sidePlayers[0].map(p => (
-                <PlayerCard key={p.id} player={p} isActive={activePlayer?.id === p.id && game.turnState !== 'GAME_OVER'} isCurrentTurn={isMyTurn} turnTimerSeconds={activePlayer?.id === p.id ? timerSeconds : 0} />
+                <PlayerCard
+                  key={p.id}
+                  player={p}
+                  isActive={activePlayer?.id === p.id && game.turnState !== 'GAME_OVER'}
+                  isCurrentTurn={isMyTurn}
+                  turnTimerSeconds={activePlayer?.id === p.id ? timerSeconds : 0}
+                  maxTimerSeconds={maxTimerSeconds}
+                  activeSpeechBubble={speechBubbles[p.id]}
+                />
               ))}
             </div>
 
@@ -557,7 +599,15 @@ export default function Home() {
 
             <div className="lg:col-span-3 grid grid-cols-2 lg:grid-cols-1 gap-3">
               {sidePlayers[1].map(p => (
-                <PlayerCard key={p.id} player={p} isActive={activePlayer?.id === p.id && game.turnState !== 'GAME_OVER'} isCurrentTurn={isMyTurn} turnTimerSeconds={activePlayer?.id === p.id ? timerSeconds : 0} />
+                <PlayerCard
+                  key={p.id}
+                  player={p}
+                  isActive={activePlayer?.id === p.id && game.turnState !== 'GAME_OVER'}
+                  isCurrentTurn={isMyTurn}
+                  turnTimerSeconds={activePlayer?.id === p.id ? timerSeconds : 0}
+                  maxTimerSeconds={maxTimerSeconds}
+                  activeSpeechBubble={speechBubbles[p.id]}
+                />
               ))}
             </div>
           </div>
@@ -588,8 +638,14 @@ export default function Home() {
       {showSettings && <SettingsModal settings={settings} onSave={saveSettings} onClose={() => setShowSettings(false)} />}
       {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
       {showAchievements && <AchievementsModal onClose={() => setShowAchievements(false)} />}
-      {showEmotes && <EmotePicker onClose={() => setShowEmotes(false)} onSelectEmote={handleSendEmote} />}
-      {showChat && <ChatPanel messages={onlineMessages} onClose={() => setShowChat(false)} onSendMessage={handleSendChat} />}
+      {showEmotes && (
+        <EmotePicker
+          onClose={() => setShowEmotes(false)}
+          onSelectEmote={handleSendEmote}
+          onSelectChat={handleSendChatMessage}
+        />
+      )}
+      {showChat && <ChatPanel messages={onlineMessages} onClose={() => setShowChat(false)} onSendMessage={handleSendChatMessage} />}
     </main>
   );
 }

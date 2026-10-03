@@ -2,9 +2,16 @@
 
 import React from 'react';
 import { LABELS, SYMBOLS } from '../lib/ludo/board';
-import { User, Bot } from 'lucide-react';
+import { User, Bot, Clock } from 'lucide-react';
 
-export default function PlayerCard({ player, isActive, isCurrentTurn, turnTimerSeconds = 0 }) {
+export default function PlayerCard({
+  player,
+  isActive,
+  isCurrentTurn,
+  turnTimerSeconds = 0,
+  maxTimerSeconds = 15,
+  activeSpeechBubble = null
+}) {
   if (!player) return null;
 
   const finishedCount = player.pieces ? player.pieces.filter(p => p.progress === 56).length : 0;
@@ -31,12 +38,25 @@ export default function PlayerCard({ player, isActive, isCurrentTurn, turnTimerS
     blue: 'ring-4 ring-blue-400/50 shadow-lg scale-[1.02]'
   };
 
+  // Turn Timer color indicator
+  const timerRatio = maxTimerSeconds > 0 ? turnTimerSeconds / maxTimerSeconds : 1;
+  const timerColor =
+    timerRatio > 0.5 ? 'bg-emerald-500 text-white' : timerRatio > 0.25 ? 'bg-amber-400 text-slate-950' : 'bg-rose-600 text-white animate-bounce';
+
   return (
     <div
       className={`relative p-3 rounded-2xl border-2 transition-all duration-300 card ${
         cardAccents[player.color] || cardAccents.red
       } ${isActive ? activeGlows[player.color] : 'opacity-85'}`}
     >
+      {/* Floating Speech Bubble / Sticker Reaction */}
+      {activeSpeechBubble && (
+        <div className="absolute -top-10 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-2xl bg-white border-2 border-slate-200 shadow-xl font-display font-black text-xs text-slate-800 whitespace-nowrap animate-pop-in flex items-center gap-1">
+          <span>{activeSpeechBubble}</span>
+          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-white border-r-2 border-b-2 border-slate-200 rotate-45" />
+        </div>
+      )}
+
       <div className="flex items-center gap-3">
         {/* Avatar */}
         <div
@@ -66,8 +86,9 @@ export default function PlayerCard({ player, isActive, isCurrentTurn, turnTimerS
 
         {/* Turn timer countdown badge */}
         {isActive && turnTimerSeconds > 0 && (
-          <div className="px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-display font-black shadow-md animate-pulse">
-            {turnTimerSeconds}s
+          <div className={`px-2.5 py-1 rounded-full ${timerColor} text-xs font-display font-black shadow-md flex items-center gap-1`}>
+            <Clock className="w-3 h-3" />
+            <span>{turnTimerSeconds}s</span>
           </div>
         )}
       </div>
