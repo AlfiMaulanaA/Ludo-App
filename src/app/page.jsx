@@ -162,11 +162,11 @@ export default function Home() {
     if (g.turnState === 'GAME_OVER') audio.play('victory');
   }, []);
 
-  // Offline action dispatcher
+  // Action dispatcher
   const applyAction = useCallback(
     action => {
       const current = gameRef.current;
-      if (!current || current.isOnlineMode) return false;
+      if (!current) return false;
       const next = structuredClone(current);
       if (!dispatch(next, action)) return false;
       gameRef.current = next;
