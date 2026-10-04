@@ -91,7 +91,10 @@ class P2PRoomManager {
         this.connections.delete(connId);
         if (this.roomState) {
           const leftPlayer = this.roomState.players.find(p => p.socketId === connId);
-          this.roomState.players = this.roomState.players.filter(p => p.socketId !== connId);
+          this.roomState = {
+            ...this.roomState,
+            players: this.roomState.players.filter(p => p.socketId !== connId)
+          };
           this.broadcast('ROOM_UPDATED', this.roomState);
           this.emit('ROOM_UPDATED', this.roomState);
           if (leftPlayer) {
@@ -186,18 +189,25 @@ class P2PRoomManager {
         return;
       }
 
-      this.roomState.players.push(newPlayer);
+      this.roomState = {
+        ...this.roomState,
+        players: [...this.roomState.players, newPlayer]
+      };
       conn.send({ type: 'JOIN_RESPONSE', payload: { success: true, roomState: this.roomState } });
       this.broadcast('ROOM_UPDATED', this.roomState);
       this.emit('ROOM_UPDATED', this.roomState);
     } else if (type === 'SELECT_COLOR') {
-      const p = this.roomState.players.find(x => x.socketId === payload.socketId);
-      if (p) p.color = payload.color;
+      const updatedPlayers = this.roomState.players.map(p =>
+        p.socketId === payload.socketId ? { ...p, color: payload.color } : p
+      );
+      this.roomState = { ...this.roomState, players: updatedPlayers };
       this.broadcast('ROOM_UPDATED', this.roomState);
       this.emit('ROOM_UPDATED', this.roomState);
     } else if (type === 'TOGGLE_READY') {
-      const p = this.roomState.players.find(x => x.socketId === payload.socketId);
-      if (p) p.isReady = !p.isReady;
+      const updatedPlayers = this.roomState.players.map(p =>
+        p.socketId === payload.socketId ? { ...p, isReady: !p.isReady } : p
+      );
+      this.roomState = { ...this.roomState, players: updatedPlayers };
       this.broadcast('ROOM_UPDATED', this.roomState);
       this.emit('ROOM_UPDATED', this.roomState);
     } else if (type === 'SEND_CHAT') {

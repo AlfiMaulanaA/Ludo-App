@@ -100,15 +100,32 @@ export default function Home() {
     if (saved) setSettings(s => ({ ...s, ...saved }));
     setHasSaved(!!loadSavedGame());
 
-    // Check for ?room=CODE or ?code=CODE search parameter
+    // Check for ?room=CODE search parameter or sessionStorage active session
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const urlCode = params.get('room') || params.get('code');
-      if (urlCode) {
-        const cleaned = urlCode.toUpperCase().trim();
+      const activeSessionRaw = sessionStorage.getItem('ludo_active_session');
+      let savedSession = null;
+      try {
+        if (activeSessionRaw) savedSession = JSON.parse(activeSessionRaw);
+      } catch {
+        /* ignore */
+      }
+
+      const targetCode = urlCode || savedSession?.code;
+      if (targetCode) {
+        const cleaned = targetCode.toUpperCase().trim();
         setInitialRoomCode(cleaned);
-        connectSocket();
         setViewState('ONLINE_LOBBY');
+        connectSocket();
+
+        // Attempt P2P re-join/connection if socket is not active
+        p2pManager.joinRoom({ roomCode: cleaned, playerName: savedSession?.playerName || 'Pemain' }, res => {
+          if (res?.success && res?.roomState) {
+            setSocketId(p2pManager.myId);
+            setOnlineRoomState(res.roomState);
+          }
+        });
       }
     }
 
@@ -411,6 +428,10 @@ export default function Home() {
       setOnlineRoomState(null);
       setOnlineMessages([]);
       setSocketId(null);
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('ludo_active_session');
+        window.history.replaceState(null, '', window.location.pathname);
+      }
     }
     audioRef.current?.play('click');
     setGame(null);
@@ -458,6 +479,13 @@ export default function Home() {
     writeStorage('settings', updated);
   };
 
+  const persistRoomUrlAndSession = (roomCode, playerName) => {
+    if (typeof window === 'undefined') return;
+    const url = `${window.location.pathname}?room=${roomCode}`;
+    window.history.replaceState(null, '', url);
+    sessionStorage.setItem('ludo_active_session', JSON.stringify({ code: roomCode, playerName: playerName || 'Pemain' }));
+  };
+
   // Online handlers with WebRTC P2P fallback
   const openOnlineLobby = () => {
     connectSocket();
@@ -471,13 +499,17 @@ export default function Home() {
         if (res?.success && res?.roomState) {
           setSocketId(p2pManager.myId);
           setOnlineRoomState(res.roomState);
+          persistRoomUrlAndSession(res.roomState.code, opts.hostName);
         }
         cb?.(res);
       });
       return;
     }
     s.emit('CREATE_ROOM', opts, res => {
-      if (res?.success && res?.roomState) setOnlineRoomState(res.roomState);
+      if (res?.success && res?.roomState) {
+        setOnlineRoomState(res.roomState);
+        persistRoomUrlAndSession(res.roomState.code, opts.hostName);
+      }
       cb?.(res);
     });
   };
@@ -489,13 +521,17 @@ export default function Home() {
         if (res?.success && res?.roomState) {
           setSocketId(p2pManager.myId);
           setOnlineRoomState(res.roomState);
+          persistRoomUrlAndSession(res.roomState.code, opts.playerName);
         }
         cb?.(res);
       });
       return;
     }
     s.emit('JOIN_ROOM', opts, res => {
-      if (res?.success && res?.roomState) setOnlineRoomState(res.roomState);
+      if (res?.success && res?.roomState) {
+        setOnlineRoomState(res.roomState);
+        persistRoomUrlAndSession(res.roomState.code, opts.playerName);
+      }
       cb?.(res);
     });
   };
@@ -507,13 +543,17 @@ export default function Home() {
         if (res?.success && res?.roomState) {
           setSocketId(p2pManager.myId);
           setOnlineRoomState(res.roomState);
+          persistRoomUrlAndSession(res.roomState.code, opts.playerName);
         }
         cb?.(res);
       });
       return;
     }
     s.emit('QUICK_MATCH', opts, res => {
-      if (res?.success && res?.roomState) setOnlineRoomState(res.roomState);
+      if (res?.success && res?.roomState) {
+        setOnlineRoomState(res.roomState);
+        persistRoomUrlAndSession(res.roomState.code, opts.playerName);
+      }
       cb?.(res);
     });
   };
