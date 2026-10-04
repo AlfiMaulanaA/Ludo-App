@@ -279,16 +279,33 @@ export default function Home() {
     if (game && !game.isOnlineMode && game.turnState === 'GAME_OVER') recordGameStats(game);
   }, [game?.turnState, game?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Offline bot turns
+  // Bot turns (Offline & P2P Host)
   useEffect(() => {
-    if (!game || game.isOnlineMode || game.turnState === 'GAME_OVER' || paused || viewState !== 'GAME') return;
+    if (!game || game.turnState === 'GAME_OVER' || paused || viewState !== 'GAME') return;
+    const s = getSocket();
+    const isSocketOnline = s && s.connected;
+    if (game.isOnlineMode && isSocketOnline) return; // Dedicated server handles bot turns
+
+    // If online P2P mode, only host executes bot turns to avoid duplicate moves
+    if (game.isOnlineMode && !p2pManager.isHost) return;
+
     const player = getCurrentPlayer(game);
     if (!player || player.type !== 'bot') return;
+
     const timer = setTimeout(() => {
-      if (game.turnState === 'WAITING_FOR_ROLL') applyAction({ type: 'ROLL_DICE' });
-      else if (game.turnState === 'SELECTING_PIECE') {
+      if (game.turnState === 'WAITING_FOR_ROLL') {
+        applyAction({ type: 'ROLL_DICE' });
+        if (game.isOnlineMode) {
+          p2pManager.broadcast('CLIENT_GAME_ACTION', { game: gameRef.current, lastAction: 'ROLL_DICE' });
+        }
+      } else if (game.turnState === 'SELECTING_PIECE') {
         const chosen = chooseMove(game, player.botDifficulty || 'medium');
-        if (chosen) applyAction({ type: 'MOVE_PIECE', pieceId: chosen.id });
+        if (chosen) {
+          applyAction({ type: 'MOVE_PIECE', pieceId: chosen.id });
+          if (game.isOnlineMode) {
+            p2pManager.broadcast('CLIENT_GAME_ACTION', { game: gameRef.current, lastAction: 'MOVE_PIECE' });
+          }
+        }
       }
     }, 800);
     return () => clearTimeout(timer);
@@ -300,8 +317,14 @@ export default function Home() {
     const valid = getValidMoves(game);
     if (valid.length !== 1) return;
     const timer = setTimeout(() => {
-      if (game.isOnlineMode) getSocket()?.emit('MOVE_PIECE', { pieceId: valid[0].id });
-      else applyAction({ type: 'MOVE_PIECE', pieceId: valid[0].id });
+      if (game.isOnlineMode) {
+        const s = getSocket();
+        if (s && s.connected) s.emit('MOVE_PIECE', { pieceId: valid[0].id });
+        else {
+          applyAction({ type: 'MOVE_PIECE', pieceId: valid[0].id });
+          p2pManager.sendAction('CLIENT_GAME_ACTION', { game: gameRef.current, lastAction: 'MOVE_PIECE' });
+        }
+      } else applyAction({ type: 'MOVE_PIECE', pieceId: valid[0].id });
     }, 500);
     return () => clearTimeout(timer);
   }, [game, isMyTurn, paused, viewState, applyAction]);
@@ -309,7 +332,10 @@ export default function Home() {
   // Turn timer
   const turnKey = game ? `${game.id}-${game.turns}-${game.turnState}-${game.currentPlayerIndex}` : null;
   useEffect(() => {
-    if (!game || game.isOnlineMode) return;
+    if (!game) return;
+    const s = getSocket();
+    if (game.isOnlineMode && s && s.connected) return; // Dedicated server handles deadline
+
     if (game.turnState === 'GAME_OVER' || !game.settings.turnTimer || getCurrentPlayer(game)?.type !== 'human') {
       setDeadline(null);
       return;
@@ -323,16 +349,28 @@ export default function Home() {
     return () => clearInterval(id);
   }, [viewState]);
 
-  // Offline timeout handler
+  // Turn timeout handler
   useEffect(() => {
-    if (!deadline || !game || game.isOnlineMode || paused || viewState !== 'GAME') return;
+    if (!deadline || !game || paused || viewState !== 'GAME') return;
+    const s = getSocket();
+    if (game.isOnlineMode && s && s.connected) return;
+
     const timer = setTimeout(() => {
       const g = gameRef.current;
       if (!g || g.turnState === 'GAME_OVER') return;
-      if (g.turnState === 'WAITING_FOR_ROLL') applyAction({ type: 'ROLL_DICE' });
-      else if (g.turnState === 'SELECTING_PIECE') {
+      if (g.turnState === 'WAITING_FOR_ROLL') {
+        applyAction({ type: 'ROLL_DICE' });
+        if (g.isOnlineMode) {
+          p2pManager.sendAction('CLIENT_GAME_ACTION', { game: gameRef.current, lastAction: 'ROLL_DICE' });
+        }
+      } else if (g.turnState === 'SELECTING_PIECE') {
         const choice = chooseMove(g, 'easy');
-        if (choice) applyAction({ type: 'MOVE_PIECE', pieceId: choice.id });
+        if (choice) {
+          applyAction({ type: 'MOVE_PIECE', pieceId: choice.id });
+          if (g.isOnlineMode) {
+            p2pManager.sendAction('CLIENT_GAME_ACTION', { game: gameRef.current, lastAction: 'MOVE_PIECE' });
+          }
+        }
       }
     }, Math.max(0, deadline - Date.now()));
     return () => clearTimeout(timer);
