@@ -451,7 +451,7 @@ export default function Home() {
       else {
         // P2P action dispatch
         applyAction({ type: 'ROLL_DICE' });
-        p2pManager.broadcast('CLIENT_GAME_ACTION', { game: gameRef.current, lastAction: 'ROLL_DICE' });
+        p2pManager.sendAction('CLIENT_GAME_ACTION', { game: gameRef.current, lastAction: 'ROLL_DICE' });
       }
     } else applyAction({ type: 'ROLL_DICE' });
   };
@@ -463,7 +463,7 @@ export default function Home() {
       if (s && s.connected) s.emit('MOVE_PIECE', { pieceId });
       else {
         applyAction({ type: 'MOVE_PIECE', pieceId });
-        p2pManager.broadcast('CLIENT_GAME_ACTION', { game: gameRef.current, lastAction: 'MOVE_PIECE' });
+        p2pManager.sendAction('CLIENT_GAME_ACTION', { game: gameRef.current, lastAction: 'MOVE_PIECE' });
       }
     } else applyAction({ type: 'MOVE_PIECE', pieceId });
   };
@@ -584,6 +584,7 @@ export default function Home() {
       const targetCount = onlineRoomState.config?.playerCount || 4;
       const allColors = ['red', 'green', 'yellow', 'blue'];
       const humanPlayers = onlineRoomState.players.map(p => ({
+        id: p.id || p.socketId,
         name: p.name,
         type: 'human',
         color: p.color
