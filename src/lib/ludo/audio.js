@@ -111,7 +111,7 @@ export class AudioManager {
 
   startMusic() {
     this.wantsMusic = true;
-    this.unlock();
+    if (!this.context || this.context.state !== 'running') return;
     if (this.musicInterval) return;
     const melody = [262, 330, 392, 523, 392, 330, 294, 349, 440, 587, 440, 349];
     this.musicInterval = setInterval(() => {

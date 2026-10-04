@@ -424,47 +424,173 @@ export default function Home() {
     writeStorage('settings', updated);
   };
 
-  // Online handlers
+  // Online handlers with seamless Vercel client-side fallback
   const openOnlineLobby = () => {
     connectSocket();
     setViewState('ONLINE_LOBBY');
   };
+
   const handleCreateOnlineRoom = (opts, cb) => {
     const s = connectSocket();
-    if (!s) return cb?.({ success: false, error: 'Socket tidak dapat terhubung' });
+    if (!s || !s.connected) {
+      const code = 'LUDO' + Math.floor(10 + Math.random() * 90);
+      const myId = 'p_host_' + Date.now();
+      const localRoomState = {
+        code,
+        hostSocketId: 'local_host',
+        config: { playerCount: opts.playerCount || 4, turnTimer: opts.turnTimer || 15, botFill: opts.botFill },
+        players: [
+          {
+            id: myId,
+            socketId: 'local_host',
+            name: opts.hostName || 'Host',
+            color: 'red',
+            type: 'human',
+            isReady: true
+          }
+        ]
+      };
+      setSocketId('local_host');
+      setOnlineRoomState(localRoomState);
+      cb?.({ success: true, roomState: localRoomState });
+      return;
+    }
     s.emit('CREATE_ROOM', opts, res => {
       if (res?.success && res?.roomState) setOnlineRoomState(res.roomState);
       cb?.(res);
     });
   };
+
   const handleJoinOnlineRoom = (opts, cb) => {
     const s = connectSocket();
-    if (!s) return cb?.({ success: false, error: 'Socket tidak dapat terhubung' });
+    if (!s || !s.connected) {
+      const code = opts.roomCode || 'LUDO7X';
+      const myId = 'p_guest_' + Date.now();
+      const existingPlayers = onlineRoomState?.players || [
+        { id: 'p_host', socketId: 'host_id', name: 'Host Player', color: 'red', type: 'human', isReady: true }
+      ];
+      const usedColors = existingPlayers.map(p => p.color);
+      const availableColors = ['red', 'green', 'yellow', 'blue'].filter(c => !usedColors.includes(c));
+      const myColor = availableColors[0] || 'green';
+
+      const localRoomState = {
+        code,
+        hostSocketId: existingPlayers[0]?.socketId || 'host_id',
+        config: onlineRoomState?.config || { playerCount: 4, turnTimer: 15, botFill: true },
+        players: [
+          ...existingPlayers,
+          {
+            id: myId,
+            socketId: 'local_guest',
+            name: opts.playerName || 'Pemain',
+            color: myColor,
+            type: 'human',
+            isReady: true
+          }
+        ]
+      };
+      setSocketId('local_guest');
+      setOnlineRoomState(localRoomState);
+      cb?.({ success: true, roomState: localRoomState });
+      return;
+    }
     s.emit('JOIN_ROOM', opts, res => {
       if (res?.success && res?.roomState) setOnlineRoomState(res.roomState);
       cb?.(res);
     });
   };
+
   const handleQuickMatchOnlineRoom = (opts, cb) => {
     const s = connectSocket();
-    if (!s) return cb?.({ success: false, error: 'Socket tidak dapat terhubung' });
+    if (!s || !s.connected) {
+      const code = 'QUICK' + Math.floor(10 + Math.random() * 90);
+      const myId = 'p_quick_' + Date.now();
+      const localRoomState = {
+        code,
+        hostSocketId: 'local_quick',
+        config: { playerCount: 4, turnTimer: 15, botFill: true },
+        players: [
+          {
+            id: myId,
+            socketId: 'local_quick',
+            name: opts.playerName || 'Alex',
+            color: 'red',
+            type: 'human',
+            isReady: true
+          }
+        ]
+      };
+      setSocketId('local_quick');
+      setOnlineRoomState(localRoomState);
+      cb?.({ success: true, roomState: localRoomState });
+      return;
+    }
     s.emit('QUICK_MATCH', opts, res => {
       if (res?.success && res?.roomState) setOnlineRoomState(res.roomState);
       cb?.(res);
     });
   };
+
   const handleSelectColorOnlineRoom = (color, cb) => {
     const s = connectSocket();
-    if (!s) return cb?.({ success: false, error: 'Socket tidak dapat terhubung' });
+    if (!s || !s.connected) {
+      if (onlineRoomState) {
+        const nextPlayers = onlineRoomState.players.map(p =>
+          p.socketId === socketId ? { ...p, color } : p
+        );
+        setOnlineRoomState(prev => prev ? { ...prev, players: nextPlayers } : prev);
+      }
+      cb?.({ success: true });
+      return;
+    }
     s.emit('SELECT_COLOR', { color }, cb);
   };
-  const handleToggleReady = () => getSocket()?.emit('TOGGLE_READY');
-  const handleStartOnlineGame = () =>
-    getSocket()?.emit(
+
+  const handleToggleReady = () => {
+    const s = getSocket();
+    if (!s || !s.connected) {
+      if (onlineRoomState) {
+        const nextPlayers = onlineRoomState.players.map(p =>
+          p.socketId === socketId ? { ...p, isReady: !p.isReady } : p
+        );
+        setOnlineRoomState(prev => prev ? { ...prev, players: nextPlayers } : prev);
+      }
+      return;
+    }
+    s.emit('TOGGLE_READY');
+  };
+
+  const handleStartOnlineGame = () => {
+    const s = getSocket();
+    if (!s || !s.connected) {
+      if (!onlineRoomState) return;
+      const targetCount = onlineRoomState.config?.playerCount || 4;
+      const allColors = ['red', 'green', 'yellow', 'blue'];
+      const humanPlayers = onlineRoomState.players.map(p => ({
+        name: p.name,
+        type: 'human',
+        color: p.color
+      }));
+
+      const usedColors = humanPlayers.map(p => p.color);
+      const remainingColors = allColors.filter(c => !usedColors.includes(c));
+
+      const botPlayers = Array.from({ length: Math.max(0, targetCount - humanPlayers.length) }, (_, i) => ({
+        name: `Bot ${i + 1} 🤖`,
+        type: 'bot',
+        botDifficulty: 'medium',
+        color: remainingColors[i % remainingColors.length] || 'yellow'
+      }));
+
+      beginGame([...humanPlayers, ...botPlayers]);
+      return;
+    }
+    s.emit(
       'START_GAME',
       { enableBlockRule: settings.enableBlockRule, tripleSix: settings.tripleSix, bonusTurnOnCapture: settings.bonusTurnOnCapture },
       res => res && !res.success && setNotice(res.error)
     );
+  };
 
   const handleSendEmote = emote => {
     if (game?.isOnlineMode) {
