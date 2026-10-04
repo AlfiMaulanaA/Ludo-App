@@ -6,6 +6,7 @@ import { chooseMove } from '../lib/ludo/ai';
 import { AudioManager } from '../lib/ludo/audio';
 import { recordGameStats, readStorage, writeStorage, getEmptyStats, loadSavedGame, saveGame, clearSavedGame } from '../lib/ludo/storage';
 import { connectSocket, disconnectSocket, getSocket } from '../lib/socket/socketClient';
+import { p2pManager } from '../lib/socket/p2pRoom';
 
 import LudoBoard from '../components/LudoBoard';
 import DiceRoller from '../components/DiceRoller';
@@ -159,11 +160,10 @@ export default function Home() {
     [playEvents]
   );
 
-  // Socket wiring
+  // Socket & P2P Realtime wiring
   useEffect(() => {
     const s = getSocket();
-    if (!s) return;
-    const onConnect = () => setSocketId(s.id);
+    const onConnect = data => setSocketId(data?.id || s?.id || p2pManager.myId);
     const onRoom = rs => setOnlineRoomState(rs);
     const onStarted = ({ roomState, game: g }) => {
       setOnlineRoomState(roomState);
@@ -194,23 +194,43 @@ export default function Home() {
     };
     const onDeadline = ({ deadline: d }) => setDeadline(d);
 
-    s.on('connect', onConnect);
-    s.on('ROOM_UPDATED', onRoom);
-    s.on('GAME_STARTED', onStarted);
-    s.on('GAME_UPDATED', onUpdated);
-    s.on('EMOTE_RECEIVED', onEmote);
-    s.on('CHAT_RECEIVED', onChat);
-    s.on('PLAYER_LEFT', onLeft);
-    s.on('TURN_DEADLINE', onDeadline);
+    if (s) {
+      s.on('connect', onConnect);
+      s.on('ROOM_UPDATED', onRoom);
+      s.on('GAME_STARTED', onStarted);
+      s.on('GAME_UPDATED', onUpdated);
+      s.on('EMOTE_RECEIVED', onEmote);
+      s.on('CHAT_RECEIVED', onChat);
+      s.on('PLAYER_LEFT', onLeft);
+      s.on('TURN_DEADLINE', onDeadline);
+    }
+
+    p2pManager.on('connect', onConnect);
+    p2pManager.on('ROOM_UPDATED', onRoom);
+    p2pManager.on('GAME_STARTED', onStarted);
+    p2pManager.on('GAME_UPDATED', onUpdated);
+    p2pManager.on('EMOTE_RECEIVED', onEmote);
+    p2pManager.on('CHAT_RECEIVED', onChat);
+    p2pManager.on('PLAYER_LEFT', onLeft);
+
     return () => {
-      s.off('connect', onConnect);
-      s.off('ROOM_UPDATED', onRoom);
-      s.off('GAME_STARTED', onStarted);
-      s.off('GAME_UPDATED', onUpdated);
-      s.off('EMOTE_RECEIVED', onEmote);
-      s.off('CHAT_RECEIVED', onChat);
-      s.off('PLAYER_LEFT', onLeft);
-      s.off('TURN_DEADLINE', onDeadline);
+      if (s) {
+        s.off('connect', onConnect);
+        s.off('ROOM_UPDATED', onRoom);
+        s.off('GAME_STARTED', onStarted);
+        s.off('GAME_UPDATED', onUpdated);
+        s.off('EMOTE_RECEIVED', onEmote);
+        s.off('CHAT_RECEIVED', onChat);
+        s.off('PLAYER_LEFT', onLeft);
+        s.off('TURN_DEADLINE', onDeadline);
+      }
+      p2pManager.off('connect', onConnect);
+      p2pManager.off('ROOM_UPDATED', onRoom);
+      p2pManager.off('GAME_STARTED', onStarted);
+      p2pManager.off('GAME_UPDATED', onUpdated);
+      p2pManager.off('EMOTE_RECEIVED', onEmote);
+      p2pManager.off('CHAT_RECEIVED', onChat);
+      p2pManager.off('PLAYER_LEFT', onLeft);
     };
   }, [playEvents]);
 
@@ -387,6 +407,7 @@ export default function Home() {
 
     if (game?.isOnlineMode || viewState === 'ONLINE_LOBBY') {
       disconnectSocket();
+      p2pManager.disconnect();
       setOnlineRoomState(null);
       setOnlineMessages([]);
       setSocketId(null);
@@ -403,14 +424,27 @@ export default function Home() {
   const handleRollDice = () => {
     if (!game || !isMyTurn || game.turnState !== 'WAITING_FOR_ROLL') return;
     audioRef.current?.unlock();
-    if (game.isOnlineMode) getSocket()?.emit('ROLL_DICE');
-    else applyAction({ type: 'ROLL_DICE' });
+    if (game.isOnlineMode) {
+      const s = getSocket();
+      if (s && s.connected) s.emit('ROLL_DICE');
+      else {
+        // P2P action dispatch
+        applyAction({ type: 'ROLL_DICE' });
+        p2pManager.broadcast('CLIENT_GAME_ACTION', { game: gameRef.current, lastAction: 'ROLL_DICE' });
+      }
+    } else applyAction({ type: 'ROLL_DICE' });
   };
 
   const handlePieceClick = pieceId => {
     if (!game || !isMyTurn || game.turnState !== 'SELECTING_PIECE') return;
-    if (game.isOnlineMode) getSocket()?.emit('MOVE_PIECE', { pieceId });
-    else applyAction({ type: 'MOVE_PIECE', pieceId });
+    if (game.isOnlineMode) {
+      const s = getSocket();
+      if (s && s.connected) s.emit('MOVE_PIECE', { pieceId });
+      else {
+        applyAction({ type: 'MOVE_PIECE', pieceId });
+        p2pManager.broadcast('CLIENT_GAME_ACTION', { game: gameRef.current, lastAction: 'MOVE_PIECE' });
+      }
+    } else applyAction({ type: 'MOVE_PIECE', pieceId });
   };
 
   const toggleMute = () => {
@@ -424,7 +458,7 @@ export default function Home() {
     writeStorage('settings', updated);
   };
 
-  // Online handlers with seamless Vercel client-side fallback
+  // Online handlers with WebRTC P2P fallback
   const openOnlineLobby = () => {
     connectSocket();
     setViewState('ONLINE_LOBBY');
@@ -433,26 +467,13 @@ export default function Home() {
   const handleCreateOnlineRoom = (opts, cb) => {
     const s = connectSocket();
     if (!s || !s.connected) {
-      const code = 'LUDO' + Math.floor(10 + Math.random() * 90);
-      const myId = 'p_host_' + Date.now();
-      const localRoomState = {
-        code,
-        hostSocketId: 'local_host',
-        config: { playerCount: opts.playerCount || 4, turnTimer: opts.turnTimer || 15, botFill: opts.botFill },
-        players: [
-          {
-            id: myId,
-            socketId: 'local_host',
-            name: opts.hostName || 'Host',
-            color: 'red',
-            type: 'human',
-            isReady: true
-          }
-        ]
-      };
-      setSocketId('local_host');
-      setOnlineRoomState(localRoomState);
-      cb?.({ success: true, roomState: localRoomState });
+      p2pManager.createRoom(opts, res => {
+        if (res?.success && res?.roomState) {
+          setSocketId(p2pManager.myId);
+          setOnlineRoomState(res.roomState);
+        }
+        cb?.(res);
+      });
       return;
     }
     s.emit('CREATE_ROOM', opts, res => {
@@ -464,34 +485,13 @@ export default function Home() {
   const handleJoinOnlineRoom = (opts, cb) => {
     const s = connectSocket();
     if (!s || !s.connected) {
-      const code = opts.roomCode || 'LUDO7X';
-      const myId = 'p_guest_' + Date.now();
-      const existingPlayers = onlineRoomState?.players || [
-        { id: 'p_host', socketId: 'host_id', name: 'Host Player', color: 'red', type: 'human', isReady: true }
-      ];
-      const usedColors = existingPlayers.map(p => p.color);
-      const availableColors = ['red', 'green', 'yellow', 'blue'].filter(c => !usedColors.includes(c));
-      const myColor = availableColors[0] || 'green';
-
-      const localRoomState = {
-        code,
-        hostSocketId: existingPlayers[0]?.socketId || 'host_id',
-        config: onlineRoomState?.config || { playerCount: 4, turnTimer: 15, botFill: true },
-        players: [
-          ...existingPlayers,
-          {
-            id: myId,
-            socketId: 'local_guest',
-            name: opts.playerName || 'Pemain',
-            color: myColor,
-            type: 'human',
-            isReady: true
-          }
-        ]
-      };
-      setSocketId('local_guest');
-      setOnlineRoomState(localRoomState);
-      cb?.({ success: true, roomState: localRoomState });
+      p2pManager.joinRoom(opts, res => {
+        if (res?.success && res?.roomState) {
+          setSocketId(p2pManager.myId);
+          setOnlineRoomState(res.roomState);
+        }
+        cb?.(res);
+      });
       return;
     }
     s.emit('JOIN_ROOM', opts, res => {
@@ -503,26 +503,13 @@ export default function Home() {
   const handleQuickMatchOnlineRoom = (opts, cb) => {
     const s = connectSocket();
     if (!s || !s.connected) {
-      const code = 'QUICK' + Math.floor(10 + Math.random() * 90);
-      const myId = 'p_quick_' + Date.now();
-      const localRoomState = {
-        code,
-        hostSocketId: 'local_quick',
-        config: { playerCount: 4, turnTimer: 15, botFill: true },
-        players: [
-          {
-            id: myId,
-            socketId: 'local_quick',
-            name: opts.playerName || 'Alex',
-            color: 'red',
-            type: 'human',
-            isReady: true
-          }
-        ]
-      };
-      setSocketId('local_quick');
-      setOnlineRoomState(localRoomState);
-      cb?.({ success: true, roomState: localRoomState });
+      p2pManager.createRoom({ hostName: opts.playerName, playerCount: 4, turnTimer: 15, botFill: true }, res => {
+        if (res?.success && res?.roomState) {
+          setSocketId(p2pManager.myId);
+          setOnlineRoomState(res.roomState);
+        }
+        cb?.(res);
+      });
       return;
     }
     s.emit('QUICK_MATCH', opts, res => {
@@ -534,12 +521,7 @@ export default function Home() {
   const handleSelectColorOnlineRoom = (color, cb) => {
     const s = connectSocket();
     if (!s || !s.connected) {
-      if (onlineRoomState) {
-        const nextPlayers = onlineRoomState.players.map(p =>
-          p.socketId === socketId ? { ...p, color } : p
-        );
-        setOnlineRoomState(prev => prev ? { ...prev, players: nextPlayers } : prev);
-      }
+      p2pManager.sendToHost('SELECT_COLOR', { color });
       cb?.({ success: true });
       return;
     }
@@ -549,12 +531,7 @@ export default function Home() {
   const handleToggleReady = () => {
     const s = getSocket();
     if (!s || !s.connected) {
-      if (onlineRoomState) {
-        const nextPlayers = onlineRoomState.players.map(p =>
-          p.socketId === socketId ? { ...p, isReady: !p.isReady } : p
-        );
-        setOnlineRoomState(prev => prev ? { ...prev, players: nextPlayers } : prev);
-      }
+      p2pManager.sendToHost('TOGGLE_READY', {});
       return;
     }
     s.emit('TOGGLE_READY');
@@ -582,7 +559,12 @@ export default function Home() {
         color: remainingColors[i % remainingColors.length] || 'yellow'
       }));
 
-      beginGame([...humanPlayers, ...botPlayers]);
+      const g = createGame([...humanPlayers, ...botPlayers], { ...settings, turnTimer: onlineRoomState.config?.turnTimer || 15 });
+      g.isOnlineMode = true;
+
+      p2pManager.broadcast('GAME_STARTED', { roomState: onlineRoomState, game: g });
+      setGame(g);
+      setViewState('GAME');
       return;
     }
     s.emit(
@@ -594,7 +576,9 @@ export default function Home() {
 
   const handleSendEmote = emote => {
     if (game?.isOnlineMode) {
-      getSocket()?.emit('SEND_EMOTE', { emote });
+      const s = getSocket();
+      if (s && s.connected) s.emit('SEND_EMOTE', { emote });
+      else p2pManager.sendToHost('SEND_EMOTE', { playerId: myOnlinePlayerId, emote });
     } else if (activePlayer) {
       triggerSpeechBubble(activePlayer.id, emote);
     }
@@ -602,11 +586,15 @@ export default function Home() {
 
   const handleSendChatMessage = text => {
     if (game?.isOnlineMode) {
-      getSocket()?.emit('SEND_CHAT', { text });
+      const s = getSocket();
+      if (s && s.connected) s.emit('SEND_CHAT', { text });
+      else p2pManager.sendToHost('SEND_CHAT', { sender: activePlayer?.name || 'Pemain', text });
     } else if (activePlayer) {
       triggerSpeechBubble(activePlayer.id, text);
     }
   };
+
+
 
   const validMoves = game && isMyTurn && game.turnState === 'SELECTING_PIECE' ? getValidMoves(game) : [];
   const validMovePieceIds = validMoves.map(m => m.id);
